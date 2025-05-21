@@ -16,7 +16,6 @@ class TestJrunSimple(unittest.TestCase):
     """Simple test for jrun package."""
 
     def tearDown(self):
-        """Clean up after the test."""
         # Remove temporary file
         if os.path.exists("test.yaml"):
             os.remove("test.yaml")
@@ -26,7 +25,7 @@ class TestJrunSimple(unittest.TestCase):
             os.remove("test.db")
 
     @patch("os.popen")
-    def test_submit_jobs(self, mock_popen):
+    def test_basic_workflow(self, mock_popen):
         """Test that jobs are submitted correctly."""
         # Setup mock to return job IDs
         mock_popen.side_effect = [
@@ -73,7 +72,8 @@ class TestJrunSimple(unittest.TestCase):
         }
 
         job_ids = submitter.walk(
-            node=root["group"],
+            # node=root["group"],
+            node=submitter._parse_group_dict(root["group"]),
             group_name=root["group"]["name"],
             preamble_map=preamble_map,
         )
@@ -103,6 +103,90 @@ class TestJrunSimple(unittest.TestCase):
         self.assertIn("12345", dependencies)
 
         print("Test completed successfully!")
+
+    @patch("os.popen")
+    def test_nested_workflow(self, mock_popen):
+        """Test that jobs are submitted correctly."""
+        # Setup mock to return job IDs
+        mock_popen.side_effect = [
+            MagicMock(
+                read=MagicMock(return_value="Submitted batch job 12345")
+            ),  # parallel job 1
+            MagicMock(
+                read=MagicMock(return_value="Submitted batch job 12346")
+            ),  # parallel job 2
+            MagicMock(
+                read=MagicMock(return_value="Submitted batch job 12347")
+            ),  # parallel job 3
+        ]
+        viewer = JobViewer("test.db")
+        submitter = JobSubmitter("test.db")
+        root = {
+            "group": {
+                "name": "test-group-nested",
+                "type": "sequential",
+                "jobs": [
+                    {
+                        "group": {
+                            "type": "parallel",
+                            "jobs": [
+                                {
+                                    "job": {
+                                        "preamble": "base",
+                                        "command": "echo 'First job'",
+                                    }
+                                },
+                                {
+                                    "job": {
+                                        "preamble": "gpu",
+                                        "command": "echo 'Second job'",
+                                    }
+                                },
+                            ],
+                        }
+                    },
+                    {
+                        "job": {
+                            "preamble": "gpu",
+                            "command": "echo 'Third job'",
+                        }
+                    },
+                ],
+            }
+        }
+        preamble_map = {
+            "base": "\n".join(
+                [
+                    "#!/bin/bash",
+                    "#SBATCH --partition=debug",
+                    "#SBATCH --output=test-%j.out",
+                    "#SBATCH --error=test-%j.err",
+                ]
+            ),
+            "gpu": "\n".join(
+                [
+                    "#SBATCH --gres=gpu:1",
+                    "#SBATCH --mem=8G",
+                ]
+            ),
+        }
+
+        submitter.walk(
+            node=submitter._parse_group_dict(root["group"]),
+            group_name=root["group"]["name"],
+            preamble_map=preamble_map,
+        )
+
+        # Verify submission
+        jobs = viewer.list_jobs()
+        job_ids_list = [job.job_id for job in jobs]
+        self.assertIn("12345", job_ids_list)
+        self.assertIn("12346", job_ids_list)
+        self.assertIn("12347", job_ids_list)
+
+        # Verify dependencies
+        self.assertIn("12345", jobs[2].depends_on)
+        self.assertIn("12346", jobs[2].depends_on)
 
 
 if __name__ == "__main__":

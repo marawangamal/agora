@@ -4,11 +4,11 @@ import random
 import re
 import subprocess
 import tempfile
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Union
 
 import yaml
 from jrun._base import JobDB
-from jrun.interfaces import JobSpec, PJob
+from jrun.interfaces import JobSpec, PGroup, PJob
 
 JOB_RE = re.compile(r"Submitted batch job (\d+)")
 
@@ -68,7 +68,7 @@ class JobSubmitter(JobDB):
 
     def walk(
         self,
-        node: Dict[str, Any],
+        node: Union[PGroup, PJob],
         preamble_map: Dict[str, str],
         dry: bool = False,
         depends_on: List[int] = [],
@@ -78,16 +78,15 @@ class JobSubmitter(JobDB):
         """Recursively walk the job tree and submit jobs."""
 
         # Base case (single leaf)
-        if node.get("job", None) is not None:
-            parsed_job = PJob(**node["job"])
+        if isinstance(node, PJob):
             # Leaf node
             # generate rand job id int
             job_id = random.randint(100000, 999999)
             job = JobSpec(
                 job_id=job_id,
-                group_name=node.get("name", group_name),
-                command=parsed_job.command,
-                preamble=preamble_map.get(parsed_job.preamble, ""),
+                group_name=group_name,
+                command=node.command,
+                preamble=preamble_map.get(node.preamble, ""),
                 depends_on=[str(_id) for _id in depends_on],
             )
             if dry:
@@ -98,9 +97,9 @@ class JobSubmitter(JobDB):
             return [job_id]
 
         # Base case (sweep)
-        elif node["type"] == "sweep":
-            cmd_template = node["command"]
-            sweep = node["sweep"]
+        elif node.type == "sweep":
+            cmd_template = node.sweep_template
+            sweep = node.sweep
             # Generate all combinations of the sweep parameters
             keys = list(sweep.keys())
             values = list(sweep.values())
@@ -112,9 +111,9 @@ class JobSubmitter(JobDB):
                 cmd = cmd_template.format(**params)
                 job = JobSpec(
                     job_id=job_id,
-                    group_name=node.get("name", group_name),
+                    group_name=group_name,
                     command=cmd,
-                    preamble=preamble_map.get(node["preamble"], ""),
+                    preamble=preamble_map.get(node.preamble, ""),
                     depends_on=[str(_id) for _id in depends_on],
                 )
                 if dry:
@@ -125,10 +124,10 @@ class JobSubmitter(JobDB):
                 return [job_id]
 
         # Recursive case:
-        elif node["type"] == "sequential":
+        elif node.type == "sequential":
             # Parallel group
             depends_on = []
-            for entry in node["jobs"]:
+            for entry in node.jobs:
                 job_ids = self.walk(
                     entry,
                     dry=dry,
@@ -139,9 +138,9 @@ class JobSubmitter(JobDB):
                 if job_ids:
                     depends_on.extend(job_ids)
 
-        elif node["type"] == "parallel":
+        elif node.type  == "parallel":
             # Parallel group
-            for entry in node["jobs"]:
+            for entry in node.jobs:
                 self.walk(
                     entry,
                     dry=dry,

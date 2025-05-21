@@ -1,15 +1,10 @@
-###############################################################################
-# Base class – JobTracker                                                     #
-###############################################################################
-
-
 import datetime
 import json
 import os
 import sqlite3
-from typing import Callable, Dict, Optional, Union
+from typing import Any, Callable, Dict, List, Optional, Union
 
-from jrun.interfaces import JobSpec
+from jrun.interfaces import JobSpec, PGroup, PJob
 
 
 class JobDB:
@@ -106,3 +101,21 @@ class JobDB:
             except:
                 statuses[job_id] = "UNKNOWN"
         return statuses
+
+    
+    def _parse_group_dict(self, d: Dict[str, Any]) -> PGroup:
+        """Convert the `group` sub-dict into a PGroup (recursive)."""
+        gtype = d["type"]
+        sweep = d.get("sweep", {})
+        children: List[Union[PGroup, PJob]] = []
+
+        for item in d.get("jobs", []):
+            if "job" in item:                    # leaf
+                jd = item["job"]
+                children.append(PJob(**jd))
+            elif "group" in item:                # nested group
+                children.append(self._parse_group_dict(item["group"]))
+            else:
+                raise ValueError(f"Unrecognized node: {item}")
+
+        return PGroup(type=gtype, jobs=children, sweep=sweep)

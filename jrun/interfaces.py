@@ -1,10 +1,5 @@
 from dataclasses import asdict, dataclass, field
-from typing import List, Dict, Any
-
-###############################################################################
-# Core data structures                                                        #
-###############################################################################
-
+from typing import List, Dict, Any, Union
 
 @dataclass
 class JobSpec:
@@ -46,7 +41,15 @@ class PJob:
 
 
 @dataclass
+class SJob:
+    preamble: str
+    command: str
+
+
+@dataclass
 class PGroup:
     type: str
-    jobs: List[Dict[str, Any]]
+    jobs: List[Union[PJob, "PGroup"]]
+    preamble: str = ""
     sweep: Dict[str, List[Any]] = field(default_factory=dict)
+    sweep_template: str = ""
