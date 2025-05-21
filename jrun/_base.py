@@ -107,6 +107,8 @@ class JobDB:
         """Convert the `group` sub-dict into a PGroup (recursive)."""
         gtype = d["type"]
         sweep = d.get("sweep", {})
+        preamble = d.get("preamble", "")
+        sweep_template = d.get("sweep_template", "")
         children: List[Union[PGroup, PJob]] = []
 
         for item in d.get("jobs", []):
@@ -118,4 +120,4 @@ class JobDB:
             else:
                 raise ValueError(f"Unrecognized node: {item}")
 
-        return PGroup(type=gtype, jobs=children, sweep=sweep)
+        return PGroup(type=gtype, jobs=children, sweep=sweep, sweep_template=sweep_template, preamble=preamble)

@@ -189,5 +189,76 @@ class TestJrunSimple(unittest.TestCase):
         self.assertIn("12346", jobs[2].depends_on)
 
 
+    @patch("os.popen")
+    def test_sweep_workflow(self, mock_popen):
+        """Test that jobs are submitted correctly."""
+        # Setup mock to return job IDs
+        mock_popen.side_effect = [
+            MagicMock(
+                read=MagicMock(return_value="Submitted batch job 22345")
+            ),  
+            MagicMock(
+                read=MagicMock(return_value="Submitted batch job 22346")
+            ),
+            MagicMock(
+                read=MagicMock(return_value="Submitted batch job 22347")
+            ),
+            MagicMock(
+                read=MagicMock(return_value="Submitted batch job 22348")
+            ),
+        ]
+        viewer = JobViewer("test.db")
+        submitter = JobSubmitter("test.db")
+        root = {
+            "group": {
+                "name": "test-group-nested",
+                "type": "sequential",
+                "jobs": [
+                    {
+                        "group": {
+                            "type": "sweep",
+                            "sweep": {
+                                "param1": [1, 2],
+                                "param2": ["a", "b"],
+                            },
+                            "sweep_template": "echo First job with param1={param1} and param2={param2}",
+                        }
+                    },
+                ],
+            }
+        }
+        preamble_map = {
+            "base": "\n".join(
+                [
+                    "#!/bin/bash",
+                    "#SBATCH --partition=debug",
+                    "#SBATCH --output=test-%j.out",
+                    "#SBATCH --error=test-%j.err",
+                ]
+            ),
+            "gpu": "\n".join(
+                [
+                    "#SBATCH --gres=gpu:1",
+                    "#SBATCH --mem=8G",
+                ]
+            ),
+        }
+
+        submitter.walk(
+            node=submitter._parse_group_dict(root["group"]),
+            group_name=root["group"]["name"],
+            preamble_map=preamble_map,
+        )
+
+        # Verify submission
+        jobs = viewer.list_jobs()
+        job_ids_list = [job.job_id for job in jobs]
+        self.assertIn("22345", job_ids_list)
+        self.assertIn("22346", job_ids_list)
+        self.assertIn("22347", job_ids_list)
+        self.assertIn("22347", job_ids_list)
+
+
+
 if __name__ == "__main__":
     unittest.main()

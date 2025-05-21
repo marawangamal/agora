@@ -98,6 +98,7 @@ class JobSubmitter(JobDB):
 
         # Base case (sweep)
         elif node.type == "sweep":
+            job_ids = []
             cmd_template = node.sweep_template
             sweep = node.sweep
             # Generate all combinations of the sweep parameters
@@ -121,7 +122,8 @@ class JobSubmitter(JobDB):
                 else:
                     job_id = self._submit_jobspec(job)
                 submitted_jobs.append(job_id)
-                return [job_id]
+                job_ids.append(job_id)
+            return job_ids
 
         # Recursive case:
         elif node.type == "sequential":
