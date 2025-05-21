@@ -1,6 +1,6 @@
-# SLURM JobRunner (jrun)
+# JRun
 
-A tool for defining, submitting, and tracking SLURM job workflows.
+A tool for submitting and tracking a tree of jobs to a SLURM cluster.
 
 ## Installation
 
