@@ -1,6 +1,7 @@
 import json
 import sqlite3
 from tabulate import tabulate
+from typing import List
 
 from jrun._base import JobDB
 from jrun.interfaces import JobSpec
@@ -53,7 +54,7 @@ class JobViewer(JobDB):
 
         conn.close()
 
-    def list_jobs(self) -> list[JobSpec]:
+    def list_jobs(self) -> List[JobSpec]:
         """List all jobs in the database."""
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()

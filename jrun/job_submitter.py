@@ -1,12 +1,10 @@
-from argparse import Namespace
 import itertools
 import os
 import random
 import re
-import shlex
 import subprocess
 import tempfile
-from typing import Any, Dict
+from typing import Any, Dict, List
 
 import yaml
 from jrun._base import JobDB
@@ -73,9 +71,9 @@ class JobSubmitter(JobDB):
         node: Dict[str, Any],
         preamble_map: Dict[str, str],
         dry: bool = False,
-        depends_on: list[int] = [],
+        depends_on: List[int] = [],
         group_name: str = "",
-        submitted_jobs: list[int] = [],
+        submitted_jobs: List[int] = [],
     ):
         """Recursively walk the job tree and submit jobs."""
 
