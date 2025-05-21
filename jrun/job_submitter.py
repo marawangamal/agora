@@ -140,7 +140,7 @@ class JobSubmitter(JobDB):
                 if job_ids:
                     depends_on.extend(job_ids)
 
-        elif node.type  == "parallel":
+        elif node.type == "parallel":
             # Parallel group
             for entry in node.jobs:
                 self.walk(

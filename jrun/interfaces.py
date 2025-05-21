@@ -1,6 +1,7 @@
 from dataclasses import asdict, dataclass, field
 from typing import List, Dict, Any, Union
 
+
 @dataclass
 class JobSpec:
     """Specification for a SLURM job."""

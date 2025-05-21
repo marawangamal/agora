@@ -188,24 +188,15 @@ class TestJrunSimple(unittest.TestCase):
         self.assertIn("12345", jobs[2].depends_on)
         self.assertIn("12346", jobs[2].depends_on)
 
-
     @patch("os.popen")
     def test_sweep_workflow(self, mock_popen):
         """Test that jobs are submitted correctly."""
         # Setup mock to return job IDs
         mock_popen.side_effect = [
-            MagicMock(
-                read=MagicMock(return_value="Submitted batch job 22345")
-            ),  
-            MagicMock(
-                read=MagicMock(return_value="Submitted batch job 22346")
-            ),
-            MagicMock(
-                read=MagicMock(return_value="Submitted batch job 22347")
-            ),
-            MagicMock(
-                read=MagicMock(return_value="Submitted batch job 22348")
-            ),
+            MagicMock(read=MagicMock(return_value="Submitted batch job 22345")),
+            MagicMock(read=MagicMock(return_value="Submitted batch job 22346")),
+            MagicMock(read=MagicMock(return_value="Submitted batch job 22347")),
+            MagicMock(read=MagicMock(return_value="Submitted batch job 22348")),
         ]
         viewer = JobViewer("test.db")
         submitter = JobSubmitter("test.db")
@@ -257,7 +248,6 @@ class TestJrunSimple(unittest.TestCase):
         self.assertIn("22346", job_ids_list)
         self.assertIn("22347", job_ids_list)
         self.assertIn("22347", job_ids_list)
-
 
 
 if __name__ == "__main__":
