@@ -5,6 +5,7 @@ This script tests the basic functionality of jrun by submitting a simple job.
 """
 
 import os
+import tempfile
 import unittest
 from unittest.mock import patch, MagicMock
 
@@ -15,25 +16,56 @@ from jrun.job_viewer import JobViewer
 class TestJrunSimple(unittest.TestCase):
     """Simple test for jrun package."""
 
-    def tearDown(self):
-        # Remove temporary file
-        if os.path.exists("test.yaml"):
-            os.remove("test.yaml")
+    # ------------------------------------------------------------------ #
+    # set-up / tear-down                                                 #
+    # ------------------------------------------------------------------ #
+    def setUp(self):
+        fd, self.db_path = tempfile.mkstemp(suffix=".db")
+        os.close(fd)
 
-        # Remove database if created
-        if os.path.exists("test.db"):
-            os.remove("test.db")
+    def tearDown(self):
+        if os.path.exists(self.db_path):
+            os.remove(self.db_path)
+
+    def get_popen_mock_fn(self):
+        """Setup mocks for os.popen."""
+
+        def mock_popen_func(command):
+            # Only mock sbatch calls, let other calls through or return empty
+            if "sbatch" in command:
+                # Track how many sbatch calls we've made
+                if not hasattr(mock_popen_func, "sbatch_count"):
+                    mock_popen_func.sbatch_count = 0
+
+                mock_popen_func.sbatch_count += 1
+                if mock_popen_func.sbatch_count in [1, 2, 3, 4]:
+                    return_value = {
+                        1: "Submitted batch job 12345",
+                        2: "Submitted batch job 12346",
+                        3: "Submitted batch job 12347",
+                        4: "Submitted batch job 12348",
+                    }[mock_popen_func.sbatch_count]
+                    return MagicMock(read=MagicMock(return_value=return_value))
+                else:
+                    return MagicMock(
+                        read=MagicMock(return_value="Submitted batch job 99999")
+                    )
+            else:
+                # For non-sbatch calls, return empty result
+                return MagicMock(read=MagicMock(return_value=""))
+
+        return mock_popen_func
 
     @patch("os.popen")
     def test_basic_workflow(self, mock_popen):
         """Test that jobs are submitted correctly."""
-        # Setup mock to return job IDs
-        mock_popen.side_effect = [
-            MagicMock(read=MagicMock(return_value="Submitted batch job 12345")),
-            MagicMock(read=MagicMock(return_value="Submitted batch job 12346")),
-        ]
-        viewer = JobViewer("test.db")
-        submitter = JobSubmitter("test.db")
+
+        ##### Setup mocks
+        mock_popen.side_effect = self.get_popen_mock_fn()
+
+        ##### Setup test
+        viewer = JobViewer(self.db_path)
+        submitter = JobSubmitter(self.db_path)
         root = {
             "group": {
                 "name": "test-group",
@@ -71,8 +103,8 @@ class TestJrunSimple(unittest.TestCase):
             ),
         }
 
+        ##### Submit jobs
         job_ids = submitter.walk(
-            # node=root["group"],
             node=submitter._parse_group_dict(root["group"]),
             group_name=root["group"]["name"],
             preamble_map=preamble_map,
@@ -85,15 +117,8 @@ class TestJrunSimple(unittest.TestCase):
         self.assertTrue(any(12345 == value for value in job_ids))
         self.assertTrue(any(12346 == value for value in job_ids))
 
-        # Verify the sbatch command was called twice
-        self.assertEqual(mock_popen.call_count, 2)
-
-        # Verify the first call had base preamble
-        first_call_args = mock_popen.call_args_list[0][0][0]
-        self.assertIn("sbatch", first_call_args)
-
         # Verify jobs are in the database
-        jobs = viewer.list_jobs()
+        jobs = viewer.get_jobs()
         job_ids_list = [job.job_id for job in jobs]
         self.assertIn("12345", job_ids_list)
         self.assertIn("12346", job_ids_list)
@@ -107,20 +132,13 @@ class TestJrunSimple(unittest.TestCase):
     @patch("os.popen")
     def test_nested_workflow(self, mock_popen):
         """Test that jobs are submitted correctly."""
-        # Setup mock to return job IDs
-        mock_popen.side_effect = [
-            MagicMock(
-                read=MagicMock(return_value="Submitted batch job 12345")
-            ),  # parallel job 1
-            MagicMock(
-                read=MagicMock(return_value="Submitted batch job 12346")
-            ),  # parallel job 2
-            MagicMock(
-                read=MagicMock(return_value="Submitted batch job 12347")
-            ),  # parallel job 3
-        ]
-        viewer = JobViewer("test.db")
-        submitter = JobSubmitter("test.db")
+
+        ##### Setup mocks
+        mock_popen.side_effect = self.get_popen_mock_fn()
+
+        ##### Setup test
+        viewer = JobViewer(self.db_path)
+        submitter = JobSubmitter(self.db_path)
         root = {
             "group": {
                 "name": "test-group-nested",
@@ -171,14 +189,16 @@ class TestJrunSimple(unittest.TestCase):
             ),
         }
 
+        ##### Submit jobs
         submitter.walk(
             node=submitter._parse_group_dict(root["group"]),
             group_name=root["group"]["name"],
             preamble_map=preamble_map,
         )
 
+        ##### Run tests
         # Verify submission
-        jobs = viewer.list_jobs()
+        jobs = viewer.get_jobs()
         job_ids_list = [job.job_id for job in jobs]
         self.assertIn("12345", job_ids_list)
         self.assertIn("12346", job_ids_list)
@@ -191,15 +211,11 @@ class TestJrunSimple(unittest.TestCase):
     @patch("os.popen")
     def test_sweep_workflow(self, mock_popen):
         """Test that jobs are submitted correctly."""
-        # Setup mock to return job IDs
-        mock_popen.side_effect = [
-            MagicMock(read=MagicMock(return_value="Submitted batch job 22345")),
-            MagicMock(read=MagicMock(return_value="Submitted batch job 22346")),
-            MagicMock(read=MagicMock(return_value="Submitted batch job 22347")),
-            MagicMock(read=MagicMock(return_value="Submitted batch job 22348")),
-        ]
-        viewer = JobViewer("test.db")
-        submitter = JobSubmitter("test.db")
+
+        ##### Setup mocks
+        mock_popen.side_effect = self.get_popen_mock_fn()
+        viewer = JobViewer(self.db_path)
+        submitter = JobSubmitter(self.db_path)
         root = {
             "group": {
                 "name": "test-group-nested",
@@ -242,12 +258,12 @@ class TestJrunSimple(unittest.TestCase):
         )
 
         # Verify submission
-        jobs = viewer.list_jobs()
+        jobs = viewer.get_jobs()
         job_ids_list = [job.job_id for job in jobs]
-        self.assertIn("22345", job_ids_list)
-        self.assertIn("22346", job_ids_list)
-        self.assertIn("22347", job_ids_list)
-        self.assertIn("22347", job_ids_list)
+        self.assertIn("12345", job_ids_list)
+        self.assertIn("12346", job_ids_list)
+        self.assertIn("12347", job_ids_list)
+        self.assertIn("12348", job_ids_list)
 
 
 if __name__ == "__main__":

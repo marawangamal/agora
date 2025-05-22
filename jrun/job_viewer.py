@@ -26,7 +26,9 @@ class JobViewer(JobDB):
             cmd = job.command[:30] + "..." if len(job.command) > 30 else job.command
             status = job_statuses.get(str(job.job_id), "UNKNOWN")  # type: ignore
             status_color = self._get_status_color(status)
-            print(f"{job.job_id} [{job.group_name}]: ({status_color}{status}\033[0m): {cmd}{deps}")
+            print(
+                f"{job.job_id} [{job.group_name}]: ({status_color}{status}\033[0m): {cmd}{deps}"
+            )
 
     def visualize_mermaid(self):
         """Generate Mermaid diagram syntax for job dependencies."""
@@ -54,7 +56,7 @@ class JobViewer(JobDB):
                 print(f"    {dep} --> {job.job_id}")
 
         print("\nCopy the above to https://mermaid.live to visualize.")
-        
+
     def status(self):
         """Display a simple job status table using tabulate."""
         conn = sqlite3.connect(self.db_path)
@@ -94,15 +96,14 @@ class JobViewer(JobDB):
 
         conn.close()
 
-
     def _get_status_color(self, status: str) -> str:
         """Get ANSI color code for job status."""
         color_map = {
             "COMPLETED": "\033[92m",  # Green
-            "RUNNING": "\033[94m",    # Blue
-            "PENDING": "\033[93m",    # Yellow
-            "FAILED": "\033[91m",     # Red
+            "RUNNING": "\033[94m",  # Blue
+            "PENDING": "\033[93m",  # Yellow
+            "FAILED": "\033[91m",  # Red
             "CANCELLED": "\033[95m",  # Magenta
-            "TIMEOUT": "\033[91m",    # Red
+            "TIMEOUT": "\033[91m",  # Red
         }
         return color_map.get(status, "\033[90m")  # Gray for unknown
