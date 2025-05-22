@@ -7,42 +7,79 @@ from collections import defaultdict, deque
 from jrun._base import JobDB
 from jrun.interfaces import JobSpec
 
-
+from rich.console import Console
+from rich.tree import Tree
 class JobViewer(JobDB):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
+
     def visualize(self):
+        """Simple Rich terminal visualization."""
+        console = Console()
+        jobs = self.get_jobs()
+        
+        if not jobs:
+            console.print("No jobs found.", style="yellow")
+            return
+        
+        # Status colors
+        colors = {
+            "COMPLETED": "green", "RUNNING": "blue", "PENDING": "yellow",
+            "FAILED": "red", "CANCELLED": "magenta"
+        }
+        
+        tree = Tree("🚀 Jobs", style="bold")
+        
+        for job in jobs:
+            # Simple job display
+            cmd = job.command[:40] + "..." if len(job.command) > 40 else job.command
+            color = colors.get(getattr(job, 'status', 'UNKNOWN'), "dim")
+            
+            job_line = f"[bold]{job.job_id}[/bold] [{job.group_name}] [{color}]{getattr(job, 'status', 'UNKNOWN')}[/{color}]: {cmd}"
+            
+            if job.depends_on:
+                job_line += f" (depends: {', '.join(job.depends_on)})"
+                
+            tree.add(job_line)
+        
+        console.print(tree)
+
+    def visualize_v1(self):
         """Display a simple ASCII visualization of job dependencies."""
         jobs = self.get_jobs()
-
+        
         if not jobs:
             print("No jobs found.")
             return
-
+            
+        # Get job statuses
+        job_statuses = {job.job_id: job.status for job in jobs}
+            
         # Build dependency graph
         job_map = {job.job_id: job for job in jobs}
-
+        
         # Find root jobs (jobs with no dependencies)
         root_jobs = [job for job in jobs if not job.depends_on]
-
+        
         if not root_jobs:
             print("No root jobs found (all jobs have dependencies - possible cycle?)")
             return
-
+            
         print("\nJob Dependency Graph:")
         print("=" * 50)
-
+        
         # Track visited jobs to avoid cycles
         visited = set()
-
+        
         for root in root_jobs:
-            self._print_job_tree(root, job_map, visited, level=0)
+            self._print_job_tree(root, job_map, job_statuses, visited, level=0)  # <- This line needs job_statuses
 
     def _print_job_tree(
         self,
         job: JobSpec,
         job_map: Dict[str, JobSpec],
+        job_statuses: Dict[str, str],
         visited: Set[str],
         level: int = 0,
     ):
@@ -60,18 +97,24 @@ class JobViewer(JobDB):
 
         # Truncate long commands for readability
         cmd = job.command
-        if len(cmd) > 40:
-            cmd = cmd[:37] + "..."
+        if len(cmd) > 30:
+            cmd = cmd[:27] + "..."
 
-        # Print job info
-        print(f"{indent}Job {job.job_id} [{job.group_name}]: {cmd}")
+        # Get job status
+        status = job_statuses.get(str(job.job_id), "UNKNOWN")
+        status_color = self._get_status_color(status)
+
+        # Print job info with status
+        print(
+            f"{indent}Job {job.job_id} [{job.group_name}] ({status_color}{status}\033[0m): {cmd}"
+        )
 
         # Find jobs that depend on this job
         dependent_jobs = [j for j in job_map.values() if job.job_id in j.depends_on]
 
         # Recursively print dependent jobs
         for dep_job in dependent_jobs:
-            self._print_job_tree(dep_job, job_map, visited, level + 1)
+            self._print_job_tree(dep_job, job_map, job_statuses, visited, level + 1)
 
     def visualize_compact(self):
         """Display a compact dependency visualization."""
@@ -84,10 +127,14 @@ class JobViewer(JobDB):
         print("\nJob Dependencies (Compact View):")
         print("=" * 40)
 
+        job_statuses = {job.job_id: job.status for job in jobs}
+
         for job in jobs:
             deps = " <- " + ", ".join(job.depends_on) if job.depends_on else ""
             cmd = job.command[:30] + "..." if len(job.command) > 30 else job.command
-            print(f"{job.job_id} [{job.group_name}]: {cmd}{deps}")
+            status = job_statuses.get(str(job.job_id), "UNKNOWN")
+            status_color = self._get_status_color(status)
+            print(f"{job.job_id} [{job.group_name}]: ({status_color}{status}\033[0m): {cmd}{deps}")
 
     def visualize_mermaid(self):
         """Generate Mermaid diagram syntax for job dependencies."""
@@ -152,3 +199,16 @@ class JobViewer(JobDB):
         print("\n" + tabulate(table_data, headers=headers, tablefmt="simple"))
 
         conn.close()
+
+
+    def _get_status_color(self, status: str) -> str:
+        """Get ANSI color code for job status."""
+        color_map = {
+            "COMPLETED": "\033[92m",  # Green
+            "RUNNING": "\033[94m",    # Blue
+            "PENDING": "\033[93m",    # Yellow
+            "FAILED": "\033[91m",     # Red
+            "CANCELLED": "\033[95m",  # Magenta
+            "TIMEOUT": "\033[91m",    # Red
+        }
+        return color_map.get(status, "\033[90m")  # Gray for unknown
