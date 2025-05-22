@@ -13,6 +13,7 @@ from jrun._base import JobDB
 from jrun.interfaces import JobSpec, PGroup, PJob
 
 JOB_RE = re.compile(r"Submitted batch job (\d+)")
+# TODO: Add deps table to schema and use a view to get deps on the fly
 
 
 class JobSubmitter(JobDB):
@@ -32,7 +33,12 @@ class JobSubmitter(JobDB):
         else:
             raise RuntimeError(f"Could not parse job id from sbatch output:\n{result}")
 
-    def _submit_jobspec(self, job_spec: JobSpec, dry: bool = False) -> int:
+    def _submit_jobspec(
+        self,
+        job_spec: JobSpec,
+        dry: bool = False,
+        ignore_statuses: List[str] = ["PENDING", "RUNNING", "COMPLETED"],
+    ):
         """Submit a single job to SLURM and return the job ID.
 
         Args:
@@ -53,7 +59,7 @@ class JobSubmitter(JobDB):
             # Check if the job is already submitted
             prev_job = self.get_job_by_command(job_spec.command)
             if prev_job:
-                if prev_job.status in ["PENDING", "RUNNING", "COMPLETED"]:
+                if prev_job.status in ignore_statuses:
                     print(f"Job with command '{job_spec.command}' already submitted")
                     return prev_job.job_id
                 else:
@@ -65,8 +71,12 @@ class JobSubmitter(JobDB):
             job_spec.job_id = job_id
             self.insert_record(JobSpec(**job_spec.to_dict()))
             print(f"Submitted job with ID {job_id}")
-            if prev_job:  # clean up old job if new job submitted successfully
+
+            # clean up
+            if prev_job:
+                # remove the previous job from the database
                 self.delete_record(prev_job)
+
             # add small delay
             time.sleep(0.1)
             return job_id
@@ -88,12 +98,29 @@ class JobSubmitter(JobDB):
         for job in jobs:
             self.cancel(job.job_id)
 
-    def retry(self, job_id: int):
+    def retry(self, job_id: int, job: Optional[JobSpec] = None):
         """Retry a job with the given job ID."""
-        job = self.get_job_by_id(job_id)
+        if job is None:
+            job = self.get_job_by_id(job_id)
+        inactive_jobs = [j for j in self.get_jobs() if j.status == "COMPLETED"]
         if job:
+            job.inactive_deps = [
+                j.job_id for j in inactive_jobs if j.job_id in job.depends_on
+            ]
             print(f"Retrying job {job_id}")
-            self._submit_jobspec(job, dry=False)
+            new_job_id = self._submit_jobspec(
+                job, dry=False, ignore_statuses=["RUNNING", "COMPLETED"]
+            )
+
+            # Get children -- should be resubmitted too
+            children = self.get_children(job_id)
+            for child in children:
+                child.depends_on.remove(str(job_id))
+                child.depends_on.append(str(new_job_id))
+                # delete the old job
+                # self.delete_record(child)
+                self.retry(child.job_id, child)
+
         else:
             print(f"Job {job_id} not found in the database.")
 
