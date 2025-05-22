@@ -61,6 +61,15 @@ Job Dependencies:
 6866831 []: (PENDING): echo 'python make_report.py' <- 6866829, 6866830
 ```
 
+```mermaid
+graph TD
+    6866829["6866829<br/>COMPLETED<br/>echo 'python train.p..."]
+    6866830["6866830<br/>COMPLETED<br/>echo 'python eval.py..."]
+    6866831["6866831<br/>COMPLETED<br/>echo 'python make_re..."]
+    6866829 --> 6866831
+    6866830 --> 6866831
+```
+
 ### Parameter Sweeps
 ```yaml
 group:
