@@ -29,7 +29,7 @@ def parse_args():
     p_viz.add_argument("--db", default="jrun.db", help="SQLite DB path")
     p_viz.add_argument(
         "--mode",
-        choices=["main", "compact", "mermaid"],
+        choices=["main", "mermaid"],
         default="main",
         help="Visualization mode",
     )
@@ -57,7 +57,6 @@ def main():
         jr = JobViewer(args.db)
         viz_fn = {
             "main": jr.visualize,
-            "compact": jr.visualize_compact,
             "mermaid": jr.visualize_mermaid,
         }[args.mode]
         viz_fn()
