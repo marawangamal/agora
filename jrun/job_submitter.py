@@ -62,9 +62,7 @@ class JobSubmitter(JobDB):
         preamble_map = {
             name: "\n".join(lines) for name, lines in cfg["preambles"].items()
         }
-        root = cfg["group"]
-        # recursively walk the tree
-        self.walk(node=cfg["group"], preamble_map=preamble_map, dry=dry)
+        self.walk(node=self._parse_group_dict(cfg["group"]), preamble_map=preamble_map, dry=dry)
 
     def walk(
         self,
