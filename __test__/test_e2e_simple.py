@@ -417,13 +417,13 @@ class TestJrunSimple(unittest.TestCase):
                                 {
                                     "job": {
                                         "preamble": "base",
-                                        "command": "echo 'First job'",
+                                        "command": "echo 'First job' --group_id {group_id}",
                                     }
                                 },
                                 {
                                     "job": {
                                         "preamble": "gpu",
-                                        "command": "echo 'Second job'",
+                                        "command": "echo 'Second job' --group_id {group_id}",
                                     }
                                 },
                             ],
@@ -432,15 +432,12 @@ class TestJrunSimple(unittest.TestCase):
                     {
                         "job": {
                             "preamble": "gpu",
-                            "command": "echo 'Third job'",
+                            "command": "echo 'Third job' --group_id {group_id}",
                         }
                     },
                 ],
             }
         }
-
-        def submit_fn(*args, **kwargs):
-            return submitter._submit_jobspec(*args, **kwargs)
 
         submitter.walk(
             node=submitter._parse_group_dict(root["group"]),
@@ -448,7 +445,6 @@ class TestJrunSimple(unittest.TestCase):
             preamble_map=self.preamble_map,
             depends_on=[],
             submitted_jobs=[],
-            submit_fn=submit_fn,
         )
 
         # Verify submission

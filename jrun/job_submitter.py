@@ -47,7 +47,7 @@ class JobSubmitter(JobDB):
             job_spec.command += " --dry"
 
         if group_id is not None:
-            job_spec.command += f" --group_id {group_id}"
+            job_spec.command = job_spec.command.format(group_id=group_id)
 
         # Create a temporary script file
         with tempfile.NamedTemporaryFile(mode="w", suffix=".sh", delete=False) as f:
@@ -107,7 +107,7 @@ class JobSubmitter(JobDB):
         }
 
         submit_fn = lambda job, group_id: self._submit_jobspec(
-            job, dry=dry, group_id=group_id if use_group_id else None
+            job, dry=dry, group_id=group_id
         )
         self.walk(
             node=self._parse_group_dict(cfg["group"]),
