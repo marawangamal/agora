@@ -11,6 +11,7 @@ class JobSpec:
     preamble: str
     group_name: str
     depends_on: List[str]
+    status: str = "UNKNOWN"
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert the dataclass instance to a dictionary."""
