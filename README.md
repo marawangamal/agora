@@ -33,15 +33,32 @@ jrun sbatch --cpus-per-task=4 --mem=16G --wrap="python train.py"
 ### Sequential Jobs
 ```yaml
 group:
-  name: "example-workflow"
+  name: "test"
   type: sequential
   jobs:
+    - group:
+        type: parallel
+        jobs:
+          - job:
+              preamble: cpu
+              command: "echo 'python train.py'"
+
+          - job:
+              preamble: cpu
+              command: "echo 'python eval.py'"
     - job:
-        preamble: base
-        command: "python preprocess.py"
-    - job:
-        preamble: base
-        command: "python train.py"
+        preamble: cpu
+        command: "echo 'python make_report.py'"
+```
+
+#### Output:
+```bash
+$ jrun viz # visualize job tree
+Job Dependencies:
+========================================
+6866829 []: (COMPLETED): echo 'python train.py'
+6866830 []: (COMPLETED): echo 'python eval.py'
+6866831 []: (PENDING): echo 'python make_report.py' <- 6866829, 6866830
 ```
 
 ### Parameter Sweeps

@@ -10,7 +10,7 @@ preambles:
 
 # Root group executed in sequence
 group:
-  name: "test-group--nested-mixed"
+  name: "test"
   type: sequential
   jobs:
     - group:
@@ -18,17 +18,12 @@ group:
         jobs:
           - job:
               preamble: cpu
-              command: "echo 'L2 - First job'"
+              command: "echo 'python train.py'"
 
           - job:
               preamble: cpu
-              command: "echo 'L2 - Second job'"
+              command: "echo 'python eval.py'"
     - job:
         preamble: cpu
-        command: "echo 'L1 - First job'"
-
-    - job:
-        preamble: cpu
-        command: "echo 'L1 - Second job'"
-
+        command: "echo 'python make_report.py'"
 
