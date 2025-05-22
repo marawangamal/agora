@@ -12,6 +12,7 @@ class JobSpec:
     group_name: str
     depends_on: List[str]
     status: str = "UNKNOWN"
+    inactive_deps: List[str] = field(default_factory=list)
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert the dataclass instance to a dictionary."""
@@ -38,8 +39,15 @@ class JobSpec:
 
         # Add dependency information if needed (must come with other SBATCH directives)
         if self.depends_on:
-            dependencies = ":".join(self.depends_on)
-            script_lines.append(f"#SBATCH --dependency=afterok:{dependencies}")
+            # Convert job IDs to a colon-separated string
+            # (e.g., "123:456:789")
+            # Filter out inactive dependencies
+            active_deps = [
+                dep for dep in self.depends_on if dep not in self.inactive_deps
+            ]
+            if len(active_deps) != 0:
+                dependencies = ":".join(active_deps)
+                script_lines.append(f"#SBATCH --dependency=afterok:{dependencies}")
 
         # Add setup commands
         if setup_lines:

@@ -133,7 +133,7 @@ class JobDB:
             )
             conn.commit()
 
-    def get_job_by_id(self, job_id: int) -> Optional[JobSpec]:
+    def get_job_by_id(self, job_id: int) -> JobSpec:
         """Get a job by its ID."""
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
@@ -154,7 +154,7 @@ class JobDB:
                 group_name=row[3],
                 depends_on=json.loads(row[4]),
             )
-        return None
+        raise ValueError(f"Job with ID {job_id} not found in the database.")
 
     def get_job_by_command(self, command: str) -> Optional[JobSpec]:
         """Get a job by its command."""
@@ -190,3 +190,59 @@ class JobDB:
             )
             for row in jobs
         ]
+
+    def update_depends_on(self, new_job_id: int, old_job_id: int) -> None:
+        """Update all jobs that depend on old_job_id to depend on new_job_id instead."""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+
+        # Get all jobs with their dependencies
+        cursor.execute("SELECT job_id, depends_on FROM jobs")
+        jobs = cursor.fetchall()
+
+        updated_count = 0
+        now = datetime.datetime.utcnow().isoformat(timespec="seconds")
+
+        for job_id, depends_on_json in jobs:
+            # Parse the JSON list (handle empty/null case)
+            depends_on = json.loads(depends_on_json) if depends_on_json else []
+
+            # Check if this job depends on the old job ID
+            old_job_str = str(old_job_id)
+            new_job_str = str(new_job_id)
+
+            if old_job_str in depends_on:
+                # Replace old job ID with new job ID
+                updated_depends_on = [
+                    new_job_str if dep == old_job_str else dep for dep in depends_on
+                ]
+
+                # Update the database
+                cursor.execute(
+                    "UPDATE jobs SET depends_on = ?, updated_at = ? WHERE job_id = ?",
+                    (json.dumps(updated_depends_on), now, job_id),
+                )
+                updated_count += 1
+                print(f"Updated job {job_id}: dependency {old_job_id} -> {new_job_id}")
+
+        conn.commit()
+        conn.close()
+
+        print(f"Updated dependencies for {updated_count} jobs")
+
+    def get_children(self, job_id: int) -> List[JobSpec]:
+        """Get all child jobs of a given job ID."""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+
+        # Get all jobs with their dependencies
+        cursor.execute("SELECT job_id, depends_on FROM jobs")
+        jobs = cursor.fetchall()
+
+        child_jobs = []
+        for job in jobs:
+            if str(job_id) in json.loads(job[1]):
+                child_jobs.append(self.get_job_by_id(job[0]))
+
+        conn.close()
+        return child_jobs
