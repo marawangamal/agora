@@ -94,7 +94,6 @@ class JobDB:
             preamble=preamble,
         )
 
-
     def insert_record(self, rec: JobSpec) -> None:
         """Insert a new job row (fails if job_id already exists)."""
         now = datetime.datetime.utcnow().isoformat(timespec="seconds")
@@ -154,7 +153,6 @@ class JobDB:
         jobs = cursor.fetchall()
         job_ids = [job[0] for job in jobs]
         job_statuses = self._get_job_statuses(job_ids)
-
 
         conn.close()
 

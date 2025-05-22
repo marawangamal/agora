@@ -28,7 +28,10 @@ def parse_args():
     p_viz = sub.add_parser("viz", help="Visualize job dependencies")
     p_viz.add_argument("--db", default="jrun.db", help="SQLite DB path")
     p_viz.add_argument(
-        "--mode", choices=["main", "compact", "mermaid"], default="main", help="Visualization mode"
+        "--mode",
+        choices=["main", "compact", "mermaid"],
+        default="main",
+        help="Visualization mode",
     )
 
     # ---------- Passthough for sbatch ----------
