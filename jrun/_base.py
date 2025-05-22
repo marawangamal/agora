@@ -148,7 +148,7 @@ class JobDB:
 
         # Get basic job information
         cursor.execute(
-            "SELECT job_id, command, preamble, group_name, depends_on FROM jobs ORDER BY updated_at DESC"
+            "SELECT job_id, command, preamble, group_name, depends_on FROM jobs ORDER BY created_at ASC"
         )
         jobs = cursor.fetchall()
         job_ids = [job[0] for job in jobs]

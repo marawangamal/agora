@@ -15,6 +15,9 @@ if __name__ == "__main__":
         "--dry", action="store_true", help="Dry run, do not submit jobs"
     )
     parser.add_argument("--job-id", type=int, help="SLURM Job ID to")
+    parser.add_argument(
+        "--param", default=None, type=str, help="Parameter to pass to the job"
+    )
 
     args = parser.parse_args()
     main(args)

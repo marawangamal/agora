@@ -1,10 +1,12 @@
+import copy
 import itertools
 import os
 import random
 import re
 import subprocess
 import tempfile
-from typing import Any, Dict, List, Union
+import time
+from typing import Any, Callable, Dict, List, Optional, Union
 
 import yaml
 from jrun._base import JobDB
@@ -30,7 +32,7 @@ class JobSubmitter(JobDB):
         else:
             raise RuntimeError(f"Could not parse job id from sbatch output:\n{result}")
 
-    def _submit_jobspec(self, job_spec: JobSpec) -> int:
+    def _submit_jobspec(self, job_spec: JobSpec, dry: bool = False) -> int:
         """Submit a single job to SLURM and return the job ID.
 
         Args:
@@ -38,6 +40,10 @@ class JobSubmitter(JobDB):
         Returns:
             The job ID as a string
         """
+
+        if dry:
+            job_spec.command += " --dry"
+
         # Create a temporary script file
         with tempfile.NamedTemporaryFile(mode="w", suffix=".sh", delete=False) as f:
             script_path = f.name
@@ -60,34 +66,66 @@ class JobSubmitter(JobDB):
             job_spec.job_id = job_id
             self.insert_record(JobSpec(**job_spec.to_dict()))
             print(f"Submitted job with ID {job_id}")
+            # add small delay
+            time.sleep(0.1)
             return job_id
         finally:
             # Clean up the temporary file
             os.unlink(script_path)
 
-    def submit(self, file: str, dry: bool = False):
+    def cancel(self, job_id: int):
+        """Cancel jobs with the given job IDs."""
+        try:
+            subprocess.run(["scancel", str(job_id)], check=True)
+            print(f"Cancelled job {job_id}")
+        except subprocess.CalledProcessError as e:
+            print(f"Failed to cancel job {job_id}: {e}")
+
+    def cancel_all(self):
+        """Cancel all jobs in the database."""
+        jobs = self.get_jobs()
+        for job in jobs:
+            self.cancel(job.job_id)
+
+    def submit(
+        self,
+        file: str,
+        dry: bool = False,
+        debug: bool = False,
+        use_group_id: bool = False,
+    ):
         """Parse the YAML file and submit jobs."""
         cfg = yaml.safe_load(open(file))
 
         preamble_map = {
             name: "\n".join(lines) for name, lines in cfg["preambles"].items()
         }
+
+        submit_fn = lambda job: self._submit_jobspec(job, dry=dry)
         self.walk(
             node=self._parse_group_dict(cfg["group"]),
             preamble_map=preamble_map,
-            dry=dry,
+            debug=debug,
+            depends_on=[],
+            submitted_jobs=[],
+            submit_fn=submit_fn,
         )
 
     def walk(
         self,
         node: Union[PGroup, PJob],
         preamble_map: Dict[str, str],
-        dry: bool = False,
+        debug: bool = False,
         depends_on: List[int] = [],
         group_name: str = "",
         submitted_jobs: List[int] = [],
+        submit_fn: Optional[Callable[[JobSpec], int]] = None,
+        group_id: Optional[str] = None,
     ):
         """Recursively walk the job tree and submit jobs."""
+        submit_fn = submit_fn if submit_fn is not None else self._submit_jobspec
+        subgroup_id = f"{random.randint(100000, 999999)}"
+        group_id = subgroup_id if group_id is None else f"{group_id}-{subgroup_id}"
 
         # Base case (single leaf)
         if isinstance(node, PJob):
@@ -101,10 +139,11 @@ class JobSubmitter(JobDB):
                 preamble=preamble_map.get(node.preamble, ""),
                 depends_on=[str(_id) for _id in depends_on],
             )
-            if dry:
-                print(f"DRY-RUN: {job.to_script()}")
+            job.command = job.command.format(group_id=group_id)
+            if debug:
+                print(f"DEBUG: \n{job.to_script()}\n")
             else:
-                job_id = self._submit_jobspec(job)
+                job_id = submit_fn(job)
             submitted_jobs.append(job_id)
             return [job_id]
 
@@ -121,7 +160,7 @@ class JobSubmitter(JobDB):
             # Iterate over the combinations
             for i, params in enumerate(combinations):
                 job_id = random.randint(100000, 999999)
-                cmd = cmd_template.format(**params)
+                cmd = cmd_template.format(**params, group_id=group_id)
                 job = JobSpec(
                     job_id=job_id,
                     group_name=group_name,
@@ -129,39 +168,49 @@ class JobSubmitter(JobDB):
                     preamble=preamble_map.get(node.preamble, ""),
                     depends_on=[str(_id) for _id in depends_on],
                 )
-                if dry:
+                if debug:
                     print(f"DRY-RUN: {job.to_script()}")
                 else:
-                    job_id = self._submit_jobspec(job)
+                    job_id = submit_fn(job)
                 submitted_jobs.append(job_id)
                 job_ids.append(job_id)
             return job_ids
 
         # Recursive case:
         elif node.type == "sequential":
-            # Parallel group
-            depends_on = []
-            for entry in node.jobs:
+            # Sequential group
+            for i, entry in enumerate(node.jobs):
                 job_ids = self.walk(
                     entry,
-                    dry=dry,
+                    debug=debug,
                     preamble_map=preamble_map,
-                    depends_on=depends_on,
+                    # depends_on=depends_on,
+                    # make a copy of depends_on
+                    depends_on=copy.deepcopy(depends_on),
                     submitted_jobs=submitted_jobs,
+                    submit_fn=submit_fn,
+                    group_id=copy.deepcopy(group_id),
                 )
                 if job_ids:
                     depends_on.extend(job_ids)
+            return job_ids
 
         elif node.type == "parallel":
             # Parallel group
+            parallel_job_ids = []
             for entry in node.jobs:
-                self.walk(
+                job_ids = self.walk(
                     entry,
-                    dry=dry,
+                    debug=debug,
                     preamble_map=preamble_map,
-                    depends_on=depends_on,
+                    depends_on=copy.deepcopy(depends_on),
                     submitted_jobs=submitted_jobs,
+                    submit_fn=submit_fn,
+                    group_id=copy.deepcopy(group_id),
                 )
+                if job_ids:
+                    parallel_job_ids.extend(job_ids)
+            return parallel_job_ids
 
         return submitted_jobs
 

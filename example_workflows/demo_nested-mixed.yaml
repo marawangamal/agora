@@ -10,7 +10,7 @@ preambles:
 
 # Root group executed in sequence
 group:
-  name: "test-group--nested"
+  name: "test-group--nested-mixed"
   type: sequential
   jobs:
     - group:

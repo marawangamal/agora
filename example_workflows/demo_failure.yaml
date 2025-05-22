@@ -1,0 +1,27 @@
+# test.yaml
+preambles:
+  # CPU-only preamble for the second job
+  cpu:
+    - "#!/bin/bash"
+    - "#SBATCH --cpus-per-task=4"
+    - "#SBATCH --mem=8G"
+    - "#SBATCH --output=slurm/slurm-%j.out"
+    - "#SBATCH --error=slurm/slurm-%j.err"
+
+# Root group executed in sequence
+group:
+  name: "test-group--failure"
+  type: sequential
+  jobs:
+    - group:
+        type: sequential
+        jobs:
+          - job:
+              preamble: cpu
+              command: "echxx 'Making a typo'"
+          - job:
+              preamble: cpu
+              command: "echo 'After typo - First job'"
+
+
+
