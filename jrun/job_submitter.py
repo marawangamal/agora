@@ -26,7 +26,6 @@ class JobSubmitter(JobDB):
         m = JOB_RE.search(result)
         if m:
             jobid = int(m.group(1))
-            print(f"→ jobid = {jobid}")
             return jobid
         else:
             raise RuntimeError(f"Could not parse job id from sbatch output:\n{result}")
@@ -45,11 +44,22 @@ class JobSubmitter(JobDB):
             f.write(job_spec.to_script())
 
         try:
+            # Check if the job is already submitted
+            prev_job = self.get_job_by_command(job_spec.command)
+            if prev_job:
+                if prev_job.status in ["PENDING", "RUNNING", "COMPLETED"]:
+                    print(f"Job with command '{job_spec.command}' already submitted")
+                    return prev_job.job_id
+                else:
+                    print(f"Job with command '{job_spec.command}' failed, resubmitting")
+                    self.delete_record(prev_job)
+
+            # Submit the job using sbatch
             result = os.popen(f"sbatch {script_path}").read()
             job_id = self._parse_job_id(result)
-            print(f"Submitted job with ID {job_id}")
             job_spec.job_id = job_id
-            self.add_record(JobSpec(**job_spec.to_dict()))
+            self.insert_record(JobSpec(**job_spec.to_dict()))
+            print(f"Submitted job with ID {job_id}")
             return job_id
         finally:
             # Clean up the temporary file
@@ -62,9 +72,11 @@ class JobSubmitter(JobDB):
         preamble_map = {
             name: "\n".join(lines) for name, lines in cfg["preambles"].items()
         }
-        root = cfg["group"]
-        # recursively walk the tree
-        self.walk(node=cfg["group"], preamble_map=preamble_map, dry=dry)
+        self.walk(
+            node=self._parse_group_dict(cfg["group"]),
+            preamble_map=preamble_map,
+            dry=dry,
+        )
 
     def walk(
         self,
@@ -159,7 +171,7 @@ class JobSubmitter(JobDB):
             ["sbatch"] + args, check=True, capture_output=True, text=True
         ).stdout.strip()
         job_id = self._parse_job_id(result)
-        self.add_record(
+        self.insert_record(
             JobSpec(
                 job_id=job_id,
                 group_name="sbatch",

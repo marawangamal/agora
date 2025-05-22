@@ -1,10 +1,7 @@
-import json
 import sqlite3
 from tabulate import tabulate
-from typing import List
 
 from jrun._base import JobDB
-from jrun.interfaces import JobSpec
 
 
 class JobViewer(JobDB):
@@ -12,11 +9,54 @@ class JobViewer(JobDB):
         super().__init__(*args, **kwargs)
 
     def visualize(self):
-        pass
+        """Display a compact dependency visualization."""
+        jobs = self.get_jobs()
 
+        if not jobs:
+            print("No jobs found.")
+            return
+
+        print("\nJob Dependencies:")
+        print("=" * 40)
+
+        job_statuses = {job.job_id: job.status for job in jobs}
+
+        for job in jobs:
+            deps = " <- " + ", ".join(job.depends_on) if job.depends_on else ""
+            cmd = job.command[:30] + "..." if len(job.command) > 30 else job.command
+            status = job_statuses.get(str(job.job_id), "UNKNOWN")  # type: ignore
+            status_color = self._get_status_color(status)
+            print(f"{job.job_id} [{job.group_name}]: ({status_color}{status}\033[0m): {cmd}{deps}")
+
+    def visualize_mermaid(self):
+        """Generate Mermaid diagram syntax for job dependencies."""
+        jobs = self.get_jobs()
+
+        if not jobs:
+            print("No jobs found.")
+            return
+
+        print("\nMermaid Diagram:")
+        print("=" * 40)
+        print("graph TD")
+
+        for job in jobs:
+            # Create node with job info
+            cmd = (
+                job.command.replace('"', "'")[:20] + "..."
+                if len(job.command) > 20
+                else job.command.replace('"', "'")
+            )
+            print(f'    {job.job_id}["{job.job_id}<br/>{job.status}<br/>{cmd}"]')
+
+            # Create edges for dependencies
+            for dep in job.depends_on:
+                print(f"    {dep} --> {job.job_id}")
+
+        print("\nCopy the above to https://mermaid.live to visualize.")
+        
     def status(self):
         """Display a simple job status table using tabulate."""
-
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
 
@@ -54,25 +94,15 @@ class JobViewer(JobDB):
 
         conn.close()
 
-    def list_jobs(self) -> List[JobSpec]:
-        """List all jobs in the database."""
-        conn = sqlite3.connect(self.db_path)
-        cursor = conn.cursor()
 
-        # Get all jobs
-        cursor.execute("SELECT * FROM jobs")
-        jobs = cursor.fetchall()
-        conn.close()
-
-        return [
-            JobSpec(
-                job_id=row[0],
-                command=row[1],
-                preamble=row[2],
-                group_name=row[3],
-                depends_on=json.loads(
-                    row[4] if row[4] else "[]"
-                ),  # Convert JSON text to list
-            )
-            for row in jobs
-        ]
+    def _get_status_color(self, status: str) -> str:
+        """Get ANSI color code for job status."""
+        color_map = {
+            "COMPLETED": "\033[92m",  # Green
+            "RUNNING": "\033[94m",    # Blue
+            "PENDING": "\033[93m",    # Yellow
+            "FAILED": "\033[91m",     # Red
+            "CANCELLED": "\033[95m",  # Magenta
+            "TIMEOUT": "\033[91m",    # Red
+        }
+        return color_map.get(status, "\033[90m")  # Gray for unknown

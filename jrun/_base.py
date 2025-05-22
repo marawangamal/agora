@@ -45,39 +45,6 @@ class JobDB:
         conn.commit()
         conn.close()
 
-    def add_record(self, rec: JobSpec) -> None:
-        """Insert a new job row (fails if job_id already exists)."""
-        now = datetime.datetime.utcnow().isoformat(timespec="seconds")
-
-        with sqlite3.connect(self.db_path) as conn:
-            cur = conn.cursor()
-            cur.execute(
-                """
-                INSERT INTO jobs (
-                    job_id, command, preamble, group_name,
-                    depends_on, created_at, updated_at
-                )
-                VALUES (?, ?, ?, ?, ?, ?, ?)
-                """,
-                (
-                    str(rec.job_id),
-                    rec.command,
-                    rec.preamble,
-                    rec.group_name,
-                    json.dumps(rec.depends_on),  # store list as JSON text
-                    # inverse: json.loads(rec.depends_on),
-                    now,
-                    now,
-                ),
-            )
-            conn.commit()
-
-    def update_record(self, rec: JobSpec):
-        pass
-
-    def delete_record(self, rec: JobSpec):
-        pass
-
     @staticmethod
     def _get_job_statuses(
         job_ids: list, on_add_status: Optional[Callable[[str], str]] = None
@@ -126,3 +93,77 @@ class JobDB:
             sweep_template=sweep_template,
             preamble=preamble,
         )
+
+    def insert_record(self, rec: JobSpec) -> None:
+        """Insert a new job row (fails if job_id already exists)."""
+        now = datetime.datetime.utcnow().isoformat(timespec="seconds")
+        with sqlite3.connect(self.db_path) as conn:
+            cur = conn.cursor()
+            cur.execute(
+                """
+                INSERT INTO jobs (
+                    job_id, command, preamble, group_name,
+                    depends_on, created_at, updated_at
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    str(rec.job_id),
+                    rec.command,
+                    rec.preamble,
+                    rec.group_name,
+                    json.dumps(rec.depends_on),  # store list as JSON text
+                    # inverse: json.loads(rec.depends_on),
+                    now,
+                    now,
+                ),
+            )
+            conn.commit()
+
+    def update_record(self, rec: JobSpec):
+        pass
+
+    def delete_record(self, rec: JobSpec) -> None:
+        """Delete a job record from the database."""
+        with sqlite3.connect(self.db_path) as conn:
+            cur = conn.cursor()
+            cur.execute(
+                "DELETE FROM jobs WHERE job_id = ?",
+                (str(rec.job_id),),
+            )
+            conn.commit()
+
+    def get_job_by_command(self, command: str) -> Optional[JobSpec]:
+        """Get a job by its command."""
+        prev_jobs = self.get_jobs()
+        for job in prev_jobs:
+            if job.command == command:
+                return job
+        return None
+
+    def get_jobs(self) -> List[JobSpec]:
+        """Get all jobs in the database."""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+
+        # Get basic job information
+        cursor.execute(
+            "SELECT job_id, command, preamble, group_name, depends_on FROM jobs ORDER BY updated_at DESC"
+        )
+        jobs = cursor.fetchall()
+        job_ids = [job[0] for job in jobs]
+        job_statuses = self._get_job_statuses(job_ids)
+
+        conn.close()
+
+        return [
+            JobSpec(
+                job_id=row[0],
+                command=row[1],
+                preamble=row[2],
+                group_name=row[3],
+                depends_on=json.loads(row[4]),
+                status=job_statuses.get(str(row[0]), "UNKNOWN"),
+            )
+            for row in jobs
+        ]

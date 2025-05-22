@@ -1,20 +1,19 @@
 # test.yaml
 preambles:
-  # CPU-only preamble for the second job
   cpu:
     - "#!/bin/bash"
     - "#SBATCH --cpus-per-task=4"
     - "#SBATCH --mem=8G"
+    - "#SBATCH --output=slurm/slurm-%j.out"
+    - "#SBATCH --error=slurm/slurm-%j.err"
 
 # Root group executed in sequence
 group:
-  name: "test-group"
+  name: "test-group--job-id"
   type: sequential
   jobs:
     - job:
         preamble: cpu
-        command: "echo 'First job'"
+        command: "python example_scripts/print_args.py --job-id $SLURM_JOB_ID"
 
-    - job:
-        preamble: cpu
-        command: "echo 'Second job'"
+
