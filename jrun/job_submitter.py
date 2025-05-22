@@ -32,9 +32,7 @@ class JobSubmitter(JobDB):
         else:
             raise RuntimeError(f"Could not parse job id from sbatch output:\n{result}")
 
-    def _submit_jobspec(
-        self, job_spec: JobSpec, group_id: Optional[str] = None, dry: bool = False
-    ) -> int:
+    def _submit_jobspec(self, job_spec: JobSpec, dry: bool = False) -> int:
         """Submit a single job to SLURM and return the job ID.
 
         Args:
@@ -45,9 +43,6 @@ class JobSubmitter(JobDB):
 
         if dry:
             job_spec.command += " --dry"
-
-        if group_id is not None:
-            job_spec.command = job_spec.command.format(group_id=group_id)
 
         # Create a temporary script file
         with tempfile.NamedTemporaryFile(mode="w", suffix=".sh", delete=False) as f:
@@ -72,7 +67,7 @@ class JobSubmitter(JobDB):
             self.insert_record(JobSpec(**job_spec.to_dict()))
             print(f"Submitted job with ID {job_id}")
             # add small delay
-            time.sleep(0.5)
+            time.sleep(0.1)
             return job_id
         finally:
             # Clean up the temporary file
@@ -106,9 +101,7 @@ class JobSubmitter(JobDB):
             name: "\n".join(lines) for name, lines in cfg["preambles"].items()
         }
 
-        submit_fn = lambda job, group_id: self._submit_jobspec(
-            job, dry=dry, group_id=group_id
-        )
+        submit_fn = lambda job: self._submit_jobspec(job, dry=dry)
         self.walk(
             node=self._parse_group_dict(cfg["group"]),
             preamble_map=preamble_map,
@@ -126,7 +119,7 @@ class JobSubmitter(JobDB):
         depends_on: List[int] = [],
         group_name: str = "",
         submitted_jobs: List[int] = [],
-        submit_fn: Optional[Callable[[JobSpec, str], int]] = None,
+        submit_fn: Optional[Callable[[JobSpec], int]] = None,
         group_id: Optional[str] = None,
     ):
         """Recursively walk the job tree and submit jobs."""
@@ -146,10 +139,11 @@ class JobSubmitter(JobDB):
                 preamble=preamble_map.get(node.preamble, ""),
                 depends_on=[str(_id) for _id in depends_on],
             )
+            job.command = job.command.format(group_id=group_id)
             if debug:
                 print(f"DEBUG: \n{job.to_script()}\n")
             else:
-                job_id = submit_fn(job, group_id)
+                job_id = submit_fn(job)
             submitted_jobs.append(job_id)
             return [job_id]
 
@@ -166,7 +160,7 @@ class JobSubmitter(JobDB):
             # Iterate over the combinations
             for i, params in enumerate(combinations):
                 job_id = random.randint(100000, 999999)
-                cmd = cmd_template.format(**params)
+                cmd = cmd_template.format(**params, group_id=group_id)
                 job = JobSpec(
                     job_id=job_id,
                     group_name=group_name,
@@ -177,7 +171,7 @@ class JobSubmitter(JobDB):
                 if debug:
                     print(f"DRY-RUN: {job.to_script()}")
                 else:
-                    job_id = submit_fn(job, group_id)
+                    job_id = submit_fn(job)
                 submitted_jobs.append(job_id)
                 job_ids.append(job_id)
             return job_ids
