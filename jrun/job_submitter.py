@@ -65,6 +65,20 @@ class JobSubmitter(JobDB):
             # Clean up the temporary file
             os.unlink(script_path)
 
+    def cancel(self, job_id: int):
+        """Cancel jobs with the given job IDs."""
+        try:
+            subprocess.run(["scancel", str(job_id)], check=True)
+            print(f"Cancelled job {job_id}")
+        except subprocess.CalledProcessError as e:
+            print(f"Failed to cancel job {job_id}: {e}")
+
+    def cancel_all(self):
+        """Cancel all jobs in the database."""
+        jobs = self.get_jobs()
+        for job in jobs:
+            self.cancel(job.job_id)
+
     def submit(self, file: str, dry: bool = False):
         """Parse the YAML file and submit jobs."""
         cfg = yaml.safe_load(open(file))
