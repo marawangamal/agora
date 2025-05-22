@@ -24,6 +24,13 @@ def parse_args():
     p_sbatch = sub.add_parser("sbatch", help="Pass args straight to sbatch")
     p_sbatch.add_argument("--db", default="jrun.db", help="SQLite DB path")
 
+    # jrun viz
+    p_viz = sub.add_parser("viz", help="Visualize job dependencies")
+    p_viz.add_argument("--db", default="jrun.db", help="SQLite DB path")
+    p_viz.add_argument(
+        "--mode", choices=["main", "compact", "mermaid"], default="main", help="Visualization mode"
+    )
+
     # ---------- Passthough for sbatch ----------
     args, unknown = parser.parse_known_args()
 
@@ -43,6 +50,14 @@ def main():
     elif args.cmd == "status":
         jr = JobViewer(args.db)
         jr.status()
+    elif args.cmd == "viz":
+        jr = JobViewer(args.db)
+        viz_fn = {
+            "main": jr.visualize,
+            "compact": jr.visualize_compact,
+            "mermaid": jr.visualize_mermaid,
+        }[args.mode]
+        viz_fn()
     elif args.cmd == "sbatch":
         jr = JobSubmitter(args.db)
         jr.sbatch(args.sbatch_args)
