@@ -1,5 +1,6 @@
-import sqlite3
 from tabulate import tabulate
+from collections import defaultdict
+from html import escape
 
 from jrun._base import JobDB
 
@@ -30,32 +31,50 @@ class JobViewer(JobDB):
                 f"{job.job_id} [{job.group_name}]: ({status_color}{status}\033[0m): {cmd}{deps}"
             )
 
-    def visualize_mermaid(self):
-        """Generate Mermaid diagram syntax for job dependencies."""
+    def visualize_mermaid(self) -> None:
         jobs = self.get_jobs()
-
         if not jobs:
             print("No jobs found.")
             return
 
-        print("\nMermaid Diagram:")
-        print("=" * 40)
-        print("graph TD")
+        icons = {
+            "COMPLETED": "✅",
+            "FAILED": "❌",
+            "CANCELLED": "❌",
+            "PENDING": "⏸️",
+            "RUNNING": "▶️",
+            "TIMEOUT": "⌛",
+        }
 
+        def short(cmd, n=50):
+            cmd = cmd.replace('"', "'")
+            return cmd[: n - 1] + "…" if len(cmd) > n else cmd
+
+        print("```mermaid")
+        print("stateDiagram-v2")
+
+        # Nodes
+        id_map = {}
         for job in jobs:
-            # Create node with job info
-            cmd = (
-                job.command.replace('"', "'")[:20] + "..."
-                if len(job.command) > 20
-                else job.command.replace('"', "'")
+            sid = f"S{job.job_id}"  # IDs must not start with a digit
+            id_map[job.job_id] = sid
+            # NEW – no escape(), just swap double quotes for single quotes
+            clean_cmd = short(job.command).replace('"', "'")
+            label = (
+                f"{icons.get(job.status,'?')} {job.job_id}<br/><code>{clean_cmd}</code>"
             )
-            print(f'    {job.job_id}["{job.job_id}<br/>{job.status}<br/>{cmd}"]')
+            print(f'    state "{label}" as {sid}')
 
-            # Create edges for dependencies
+        # Edges
+        for job in jobs:
             for dep in job.depends_on:
-                print(f"    {dep} --> {job.job_id}")
+                if dep in id_map:
+                    print(f"    {id_map[dep]} --> {id_map[job.job_id]}")
 
-        print("\nCopy the above to https://mermaid.live to visualize.")
+        print("```")
+        print(
+            "\nPaste the fenced block above into mermaid.live (or any Markdown viewer with Mermaid support) to render the diagram."
+        )
 
     def status(self):
         """Display a simple job status table using tabulate."""
