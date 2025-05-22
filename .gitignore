@@ -1,2 +1,8 @@
 .venv
 jrun.db
+**.pyc
+__pycache__/
+
+# eggs
+*.egg
+*.egg-info

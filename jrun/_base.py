@@ -133,6 +133,29 @@ class JobDB:
             )
             conn.commit()
 
+    def get_job_by_id(self, job_id: int) -> Optional[JobSpec]:
+        """Get a job by its ID."""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+
+        # Get job information
+        cursor.execute(
+            "SELECT job_id, command, preamble, group_name, depends_on FROM jobs WHERE job_id = ?",
+            (job_id,),
+        )
+        row = cursor.fetchone()
+        conn.close()
+
+        if row:
+            return JobSpec(
+                job_id=row[0],
+                command=row[1],
+                preamble=row[2],
+                group_name=row[3],
+                depends_on=json.loads(row[4]),
+            )
+        return None
+
     def get_job_by_command(self, command: str) -> Optional[JobSpec]:
         """Get a job by its command."""
         prev_jobs = self.get_jobs()

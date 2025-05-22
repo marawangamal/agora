@@ -84,6 +84,18 @@ def parse_args():
     p_clean = sub.add_parser("delete", help="Clear up the database")
     p_clean.add_argument("--db", default=default_db, help="SQLite DB path")
 
+    # jrun retry (resubmit jobs)
+    p_retry = sub.add_parser("retry", help="Retry jobs")
+    p_retry.add_argument("--db", default=default_db, help="SQLite DB path")
+    p_retry.add_argument(
+        "--dry", action="store_true", help="Pass --dry to all job commands"
+    )
+    p_retry.add_argument(
+        "job_ids",
+        nargs="*",  # Zero or more (optional)
+        help="Job IDs to retry (space-separated)",
+    )
+
     # ---------- Passthough for sbatch ----------
     args, unknown = parser.parse_known_args()
 
@@ -102,6 +114,17 @@ def main():
     if args.cmd == "submit":
         jr = JobSubmitter(args.db)
         jr.submit(args.file, debug=args.debug, dry=args.dry)
+
+    elif args.cmd == "retry":
+        jr = JobSubmitter(args.db)
+        if len(args.job_ids) == 0:
+            jr.retry_all(dry=args.dry)
+        else:
+            job_ids = [int(job_id) for job_id in args.job_ids]
+            if len(job_ids) == 0:
+                return jr.retry_all()
+            for job_id in job_ids:
+                jr.retry(job_id)
 
     # Show job statuses
     elif args.cmd == "status":

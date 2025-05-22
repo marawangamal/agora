@@ -58,7 +58,6 @@ class JobSubmitter(JobDB):
                     return prev_job.job_id
                 else:
                     print(f"Job with command '{job_spec.command}' failed, resubmitting")
-                    self.delete_record(prev_job)
 
             # Submit the job using sbatch
             result = os.popen(f"sbatch {script_path}").read()
@@ -66,6 +65,8 @@ class JobSubmitter(JobDB):
             job_spec.job_id = job_id
             self.insert_record(JobSpec(**job_spec.to_dict()))
             print(f"Submitted job with ID {job_id}")
+            if prev_job:  # clean up old job if new job submitted successfully
+                self.delete_record(prev_job)
             # add small delay
             time.sleep(0.1)
             return job_id
@@ -86,6 +87,24 @@ class JobSubmitter(JobDB):
         jobs = self.get_jobs()
         for job in jobs:
             self.cancel(job.job_id)
+
+    def retry(self, job_id: int):
+        """Retry a job with the given job ID."""
+        job = self.get_job_by_id(job_id)
+        if job:
+            print(f"Retrying job {job_id}")
+            self._submit_jobspec(job, dry=False)
+        else:
+            print(f"Job {job_id} not found in the database.")
+
+    def retry_all(self, dry: bool = False):
+        jobs = self.get_jobs()
+        for job in jobs:
+            if job.status == "FAILED":
+                print(f"Retrying job {job.job_id}")
+                self._submit_jobspec(job, dry=dry)
+            else:
+                print(f"Job {job.job_id} is not in a failed state.")
 
     def submit(
         self,
@@ -141,7 +160,7 @@ class JobSubmitter(JobDB):
             )
             job.command = job.command.format(group_id=group_id)
             if debug:
-                print(f"DEBUG: \n{job.to_script()}\n")
+                print(f"\nDEBUG:\n{job.to_script()}\n")
             else:
                 job_id = submit_fn(job)
             submitted_jobs.append(job_id)
@@ -169,7 +188,7 @@ class JobSubmitter(JobDB):
                     depends_on=[str(_id) for _id in depends_on],
                 )
                 if debug:
-                    print(f"DRY-RUN: {job.to_script()}")
+                    print(f"\nDEBUG:\n{job.to_script()}\n")
                 else:
                     job_id = submit_fn(job)
                 submitted_jobs.append(job_id)
