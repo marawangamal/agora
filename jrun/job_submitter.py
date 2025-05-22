@@ -32,7 +32,9 @@ class JobSubmitter(JobDB):
         else:
             raise RuntimeError(f"Could not parse job id from sbatch output:\n{result}")
 
-    def _submit_jobspec(self, job_spec: JobSpec, dry: bool = False) -> int:
+    def _submit_jobspec(
+        self, job_spec: JobSpec, group_id: Optional[str] = None, dry: bool = False
+    ) -> int:
         """Submit a single job to SLURM and return the job ID.
 
         Args:
@@ -43,6 +45,9 @@ class JobSubmitter(JobDB):
 
         if dry:
             job_spec.command += " --dry"
+
+        if group_id is not None:
+            job_spec.command += f" --group_id {group_id}"
 
         # Create a temporary script file
         with tempfile.NamedTemporaryFile(mode="w", suffix=".sh", delete=False) as f:
@@ -87,7 +92,13 @@ class JobSubmitter(JobDB):
         for job in jobs:
             self.cancel(job.job_id)
 
-    def submit(self, file: str, dry: bool = False, debug: bool = False):
+    def submit(
+        self,
+        file: str,
+        dry: bool = False,
+        debug: bool = False,
+        use_group_id: bool = False,
+    ):
         """Parse the YAML file and submit jobs."""
         cfg = yaml.safe_load(open(file))
 
@@ -95,7 +106,9 @@ class JobSubmitter(JobDB):
             name: "\n".join(lines) for name, lines in cfg["preambles"].items()
         }
 
-        submit_fn = lambda job: self._submit_jobspec(job, dry=dry)
+        submit_fn = lambda job, group_id: self._submit_jobspec(
+            job, dry=dry, group_id=group_id if use_group_id else None
+        )
         self.walk(
             node=self._parse_group_dict(cfg["group"]),
             preamble_map=preamble_map,
@@ -113,10 +126,13 @@ class JobSubmitter(JobDB):
         depends_on: List[int] = [],
         group_name: str = "",
         submitted_jobs: List[int] = [],
-        submit_fn: Optional[Callable[[JobSpec], int]] = None,
+        submit_fn: Optional[Callable[[JobSpec, str], int]] = None,
+        group_id: Optional[str] = None,
     ):
         """Recursively walk the job tree and submit jobs."""
         submit_fn = submit_fn if submit_fn is not None else self._submit_jobspec
+        subgroup_id = f"{random.randint(100000, 999999)}"
+        group_id = subgroup_id if group_id is None else f"{group_id}-{subgroup_id}"
 
         # Base case (single leaf)
         if isinstance(node, PJob):
@@ -133,7 +149,7 @@ class JobSubmitter(JobDB):
             if debug:
                 print(f"DEBUG: \n{job.to_script()}\n")
             else:
-                job_id = submit_fn(job)
+                job_id = submit_fn(job, group_id)
             submitted_jobs.append(job_id)
             return [job_id]
 
@@ -161,7 +177,7 @@ class JobSubmitter(JobDB):
                 if debug:
                     print(f"DRY-RUN: {job.to_script()}")
                 else:
-                    job_id = submit_fn(job)
+                    job_id = submit_fn(job, group_id)
                 submitted_jobs.append(job_id)
                 job_ids.append(job_id)
             return job_ids
@@ -179,6 +195,7 @@ class JobSubmitter(JobDB):
                     depends_on=copy.deepcopy(depends_on),
                     submitted_jobs=submitted_jobs,
                     submit_fn=submit_fn,
+                    group_id=copy.deepcopy(group_id),
                 )
                 if job_ids:
                     depends_on.extend(job_ids)
@@ -195,6 +212,7 @@ class JobSubmitter(JobDB):
                     depends_on=copy.deepcopy(depends_on),
                     submitted_jobs=submitted_jobs,
                     submit_fn=submit_fn,
+                    group_id=copy.deepcopy(group_id),
                 )
                 if job_ids:
                     parallel_job_ids.extend(job_ids)
