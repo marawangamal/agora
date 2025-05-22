@@ -5,6 +5,7 @@ import random
 import re
 import subprocess
 import tempfile
+import time
 from typing import Any, Callable, Dict, List, Optional, Union
 
 import yaml
@@ -65,6 +66,8 @@ class JobSubmitter(JobDB):
             job_spec.job_id = job_id
             self.insert_record(JobSpec(**job_spec.to_dict()))
             print(f"Submitted job with ID {job_id}")
+            # add small delay
+            time.sleep(0.5)
             return job_id
         finally:
             # Clean up the temporary file
@@ -128,7 +131,7 @@ class JobSubmitter(JobDB):
                 depends_on=[str(_id) for _id in depends_on],
             )
             if debug:
-                print(f"DRY-RUN: {job.to_script()}")
+                print(f"DEBUG: \n{job.to_script()}\n")
             else:
                 job_id = submit_fn(job)
             submitted_jobs.append(job_id)

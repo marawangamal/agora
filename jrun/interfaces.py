@@ -23,14 +23,29 @@ class JobSpec:
         Returns:
             String containing the complete SLURM script
         """
-        script_lines = [self.preamble]
+        # Split preamble into SBATCH directives and setup commands
+        sbatch_lines = []
+        setup_lines = []
 
-        # Add dependency information if needed
+        for line in self.preamble.split("\n"):
+            line = line.strip()
+            if line.startswith("#SBATCH") or line.startswith("#!/"):
+                sbatch_lines.append(line)
+            elif line:  # Non-empty, non-SBATCH line
+                setup_lines.append(line)
+
+        script_lines = sbatch_lines.copy()
+
+        # Add dependency information if needed (must come with other SBATCH directives)
         if self.depends_on:
             dependencies = ":".join(self.depends_on)
             script_lines.append(f"#SBATCH --dependency=afterok:{dependencies}")
 
-        # Add the command
+        # Add setup commands
+        if setup_lines:
+            script_lines.extend(setup_lines)
+
+        # Add the main command
         script_lines.append(self.command)
 
         return "\n".join(script_lines)
