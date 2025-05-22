@@ -21,6 +21,9 @@ def handle_delete_db(db_path):
     )
     if confirm == "y":
         db_path = Path(db_path)
+        # Cancel all jobs before deleting the database
+        jr = JobSubmitter(db_path)
+        jr.cancel_all()
         if db_path.exists():
             db_path.unlink()
             print(f"Deleted database at {db_path}")
