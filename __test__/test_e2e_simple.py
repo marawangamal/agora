@@ -9,6 +9,7 @@ import tempfile
 import unittest
 from unittest.mock import patch, MagicMock
 
+from jrun.interfaces import JobSpec
 from jrun.job_submitter import JobSubmitter
 from jrun.job_viewer import JobViewer
 
@@ -349,6 +350,52 @@ class TestJrunSimple(unittest.TestCase):
         self.assertIn("12345", jobs[1].depends_on)
         self.assertIn("12345", jobs[2].depends_on)
         self.assertIn("12346", jobs[2].depends_on)
+
+    @patch("os.popen")
+    def test_dryrun_workflow(self, mock_popen):
+        """Test that jobs are submitted correctly."""
+
+        ##### Setup mocks
+        mock_popen.side_effect = self.get_popen_mock_fn()
+        viewer = JobViewer(self.db_path)
+        submitter = JobSubmitter(self.db_path)
+        root = {
+            "group": {
+                "name": "test-group-nested",
+                "type": "sequential",
+                "jobs": [
+                    {
+                        "job": {
+                            "preamble": "base",
+                            "command": "echo 'First job'",
+                        },
+                    },
+                    {
+                        "job": {
+                            "preamble": "base",
+                            "command": "echo 'Second job'",
+                        },
+                    },
+                ],
+            }
+        }
+
+        # submit_fn = lambda job: submitter._submit_jobspec(job, dry=True)
+        def submit_fn(job: JobSpec):
+            return submitter._submit_jobspec(job, dry=True)
+
+        submitter.walk(
+            node=submitter._parse_group_dict(root["group"]),
+            group_name=root["group"]["name"],
+            preamble_map=self.preamble_map,
+            depends_on=[],
+            submitted_jobs=[],
+            submit_fn=submit_fn,
+        )
+
+        # Verify submission
+        jobs = viewer.get_jobs()
+        self.assertIn("--dry", jobs[0].command)
 
 
 if __name__ == "__main__":

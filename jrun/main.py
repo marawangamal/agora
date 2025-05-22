@@ -45,7 +45,10 @@ def parse_args():
     p_submit.add_argument("--file", required=True, help="Path to workflow.yaml")
     p_submit.add_argument("--db", default=default_db, help="SQLite DB path")
     p_submit.add_argument(
-        "--dry", action="store_true", help="Don't call sbatch, just print & record"
+        "--dry", action="store_true", help="Pass --dry to all job commands"
+    )
+    p_submit.add_argument(
+        "--debug", action="store_true", help="Don't call sbatch, just print & record"
     )
 
     # jrun status (get job status)
@@ -94,12 +97,18 @@ def parse_args():
 
 def main():
     args = parse_args()
+
+    # Submit yaml workflow
     if args.cmd == "submit":
         jr = JobSubmitter(args.db)
-        jr.submit(args.file, dry=args.dry)
+        jr.submit(args.file, debug=args.debug, dry=args.dry)
+
+    # Show job statuses
     elif args.cmd == "status":
         jr = JobViewer(args.db)
         jr.status()
+
+    # Visualize job dependencies
     elif args.cmd == "viz":
         jr = JobViewer(args.db)
         viz_fn = {
@@ -107,11 +116,17 @@ def main():
             "mermaid": jr.visualize_mermaid,
         }[args.mode]
         viz_fn()
+
+    # Pass args straight to sbatch
     elif args.cmd == "sbatch":
         jr = JobSubmitter(args.db)
         jr.sbatch(args.sbatch_args)
+
+    # Delete the database
     elif args.cmd == "delete":
         handle_delete_db(args.db)
+
+    # Cancel jobs
     elif args.cmd == "cancel":
         jr = JobSubmitter(args.db)
         job_ids = [int(job_id) for job_id in args.job_ids]
