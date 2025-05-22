@@ -62,21 +62,18 @@ class JobViewer(JobDB):
         jobs = self.get_jobs()
         table_data = []
         for job in jobs:
-            # Truncate long commands
-            job_id, group, cmd, status = (
-                job.job_id,
-                job.group_name,
-                job.command.replace('"', "'"),
-                job.status,
-            )
-            if len(cmd) > 40:
-                cmd = cmd[:37] + "..."
-            # Add to table data
-            table_data.append([job_id, group, cmd, status])
+            table_data.append([job.job_id, job.group_name, job.command, job.status])
 
         # Print table using tabulate
         headers = ["ID", "GROUP", "COMMAND", "STATUS"]
-        print("\n" + tabulate(table_data, headers=headers, tablefmt="simple"))
+        col_widths = [10, 10, 80, 10]
+        # print("\n" + tabulate(table_data, headers=headers, tablefmt="simple"))
+        print(
+            "\n"
+            + tabulate(
+                table_data, headers=headers, tablefmt="grid", maxcolwidths=col_widths
+            )
+        )
 
     def _get_status_color(self, status: str) -> str:
         """Get ANSI color code for job status."""
