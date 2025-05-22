@@ -10,7 +10,7 @@ preambles:
 
 # Root group executed in sequence
 group:
-  name: "test-group--failure"
+  name: "test-group--nested-sequentials"
   type: sequential
   jobs:
     - group:
@@ -18,10 +18,15 @@ group:
         jobs:
           - job:
               preamble: cpu
-              command: "echxx 'Making a typo'"
+              command: "echo 'Making a typo'"
+    - group:
+        type: sequential
+        jobs:
           - job:
               preamble: cpu
               command: "echo 'After typo - First job'"
-
+          - job:
+              preamble: cpu
+              command: "echo 'After typo - Second job'"
 
 

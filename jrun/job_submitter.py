@@ -1,3 +1,4 @@
+import copy
 import itertools
 import os
 import random
@@ -153,29 +154,35 @@ class JobSubmitter(JobDB):
 
         # Recursive case:
         elif node.type == "sequential":
+            # Sequential group
+            for i, entry in enumerate(node.jobs):
+                job_ids = self.walk(
+                    entry,
+                    dry=dry,
+                    preamble_map=preamble_map,
+                    # depends_on=depends_on,
+                    # make a copy of depends_on
+                    depends_on=copy.deepcopy(depends_on),
+                    submitted_jobs=submitted_jobs,
+                )
+                if job_ids:
+                    depends_on.extend(job_ids)
+            return job_ids
+
+        elif node.type == "parallel":
             # Parallel group
-            depends_on = []
+            parallel_job_ids = []
             for entry in node.jobs:
                 job_ids = self.walk(
                     entry,
                     dry=dry,
                     preamble_map=preamble_map,
-                    depends_on=depends_on,
+                    depends_on=copy.deepcopy(depends_on),
                     submitted_jobs=submitted_jobs,
                 )
                 if job_ids:
-                    depends_on.extend(job_ids)
-
-        elif node.type == "parallel":
-            # Parallel group
-            for entry in node.jobs:
-                self.walk(
-                    entry,
-                    dry=dry,
-                    preamble_map=preamble_map,
-                    depends_on=depends_on,
-                    submitted_jobs=submitted_jobs,
-                )
+                    parallel_job_ids.extend(job_ids)
+            return parallel_job_ids
 
         return submitted_jobs
 

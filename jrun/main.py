@@ -67,7 +67,7 @@ def parse_args():
     p_cancel = sub.add_parser("cancel", help="Cancel jobs")
     p_cancel.add_argument(
         "job_ids",
-        nargs="+",
+        nargs="*",  # Zero or more (optional)
         help="Job IDs to cancel (space-separated)",
     )
     p_cancel.add_argument(

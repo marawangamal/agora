@@ -20,8 +20,28 @@ class TestJrunSimple(unittest.TestCase):
     # set-up / tear-down                                                 #
     # ------------------------------------------------------------------ #
     def setUp(self):
+
+        # Create a temporary database file
         fd, self.db_path = tempfile.mkstemp(suffix=".db")
         os.close(fd)
+
+        # Create commond preamble map
+        self.preamble_map = {
+            "base": "\n".join(
+                [
+                    "#!/bin/bash",
+                    "#SBATCH --partition=debug",
+                    "#SBATCH --output=test-%j.out",
+                    "#SBATCH --error=test-%j.err",
+                ]
+            ),
+            "gpu": "\n".join(
+                [
+                    "#SBATCH --gres=gpu:1",
+                    "#SBATCH --mem=8G",
+                ]
+            ),
+        }
 
     def tearDown(self):
         if os.path.exists(self.db_path):
@@ -104,28 +124,23 @@ class TestJrunSimple(unittest.TestCase):
         }
 
         ##### Submit jobs
-        job_ids = submitter.walk(
+        submitter.walk(
             node=submitter._parse_group_dict(root["group"]),
             group_name=root["group"]["name"],
             preamble_map=preamble_map,
+            depends_on=[],
+            submitted_jobs=[],
         )
-        if not job_ids:
-            raise RuntimeError("No job IDs returned from walk method.")
-
-        # Verify submission
-        self.assertEqual(len(job_ids), 2)
-        self.assertTrue(any(12345 == value for value in job_ids))
-        self.assertTrue(any(12346 == value for value in job_ids))
 
         # Verify jobs are in the database
         jobs = viewer.get_jobs()
+        self.assertEqual(len(jobs), 2)
         job_ids_list = [job.job_id for job in jobs]
         self.assertIn("12345", job_ids_list)
         self.assertIn("12346", job_ids_list)
 
         # Verify second job depends on first job
-        dependencies = jobs[1].depends_on
-        self.assertIn("12345", dependencies)
+        self.assertIn("12345", jobs[1].depends_on)
 
         print("Test completed successfully!")
 
@@ -194,6 +209,8 @@ class TestJrunSimple(unittest.TestCase):
             node=submitter._parse_group_dict(root["group"]),
             group_name=root["group"]["name"],
             preamble_map=preamble_map,
+            depends_on=[],
+            submitted_jobs=[],
         )
 
         ##### Run tests
@@ -264,6 +281,74 @@ class TestJrunSimple(unittest.TestCase):
         self.assertIn("12346", job_ids_list)
         self.assertIn("12347", job_ids_list)
         self.assertIn("12348", job_ids_list)
+
+    @patch("os.popen")
+    def test_nested_seqs_workflow(self, mock_popen):
+        """Test that jobs are submitted correctly."""
+
+        ##### Setup mocks
+        mock_popen.side_effect = self.get_popen_mock_fn()
+        viewer = JobViewer(self.db_path)
+        submitter = JobSubmitter(self.db_path)
+        root = {
+            "group": {
+                "name": "test-group-nested",
+                "type": "sequential",
+                "jobs": [
+                    {
+                        "group": {
+                            "type": "sequential",
+                            "jobs": [
+                                {
+                                    "job": {
+                                        "preamble": "base",
+                                        "command": "echo 'First job'",
+                                    }
+                                }
+                            ],
+                        },
+                    },
+                    {
+                        "group": {
+                            "type": "sequential",
+                            "jobs": [
+                                {
+                                    "job": {
+                                        "preamble": "base",
+                                        "command": "echo 'Second job'",
+                                    },
+                                },
+                                {
+                                    "job": {
+                                        "preamble": "base",
+                                        "command": "echo 'Third job'",
+                                    },
+                                },
+                            ],
+                        },
+                    },
+                ],
+            }
+        }
+
+        submitter.walk(
+            node=submitter._parse_group_dict(root["group"]),
+            group_name=root["group"]["name"],
+            preamble_map=self.preamble_map,
+            depends_on=[],
+            submitted_jobs=[],
+        )
+
+        # Verify submission
+        jobs = viewer.get_jobs()
+        job_ids_list = [job.job_id for job in jobs]
+        self.assertIn("12345", job_ids_list)
+        self.assertIn("12346", job_ids_list)
+
+        # Verify dependencies
+        self.assertIn("12345", jobs[1].depends_on)
+        self.assertIn("12345", jobs[2].depends_on)
+        self.assertIn("12346", jobs[2].depends_on)
 
 
 if __name__ == "__main__":
