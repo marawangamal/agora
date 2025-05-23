@@ -91,6 +91,12 @@ def parse_args():
         "--dry", action="store_true", help="Pass --dry to all job commands"
     )
     p_retry.add_argument(
+        "--force",
+        action="store_true",
+        help="Force resubmit even if job is not in failed state",
+        default=False,
+    )
+    p_retry.add_argument(
         "job_ids",
         nargs="*",  # Zero or more (optional)
         help="Job IDs to retry (space-separated)",
@@ -117,14 +123,9 @@ def main():
 
     elif args.cmd == "retry":
         jr = JobSubmitter(args.db)
-        if len(args.job_ids) == 0:
-            jr.retry_all(dry=args.dry)
-        else:
-            job_ids = [int(job_id) for job_id in args.job_ids]
-            if len(job_ids) == 0:
-                return jr.retry_all()
-            for job_id in job_ids:
-                jr.retry(job_id)
+        job_ids = [int(job_id) for job_id in args.job_ids]
+        for job_id in job_ids:
+            jr.retry(job_id, force=args.force)
 
     # Show job statuses
     elif args.cmd == "status":

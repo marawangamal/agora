@@ -98,7 +98,7 @@ class JobSubmitter(JobDB):
         for job in jobs:
             self.cancel(job.job_id)
 
-    def retry(self, job_id: int, job: Optional[JobSpec] = None):
+    def retry(self, job_id: int, job: Optional[JobSpec] = None, force: bool = False):
         """Retry a job with the given job ID."""
         if job is None:
             job = self.get_job_by_id(job_id)
@@ -108,8 +108,9 @@ class JobSubmitter(JobDB):
                 j.job_id for j in inactive_jobs if j.job_id in job.depends_on
             ]
             print(f"Retrying job {job_id}")
+            ignore_statuses = ["RUNNING", "COMPLETED"] if not force else []
             new_job_id = self._submit_jobspec(
-                job, dry=False, ignore_statuses=["RUNNING", "COMPLETED"]
+                job, dry=False, ignore_statuses=ignore_statuses
             )
 
             # Get children -- should be resubmitted too
@@ -123,15 +124,6 @@ class JobSubmitter(JobDB):
 
         else:
             print(f"Job {job_id} not found in the database.")
-
-    def retry_all(self, dry: bool = False):
-        jobs = self.get_jobs()
-        for job in jobs:
-            if job.status == "FAILED":
-                print(f"Retrying job {job.job_id}")
-                self._submit_jobspec(job, dry=dry)
-            else:
-                print(f"Job {job.job_id} is not in a failed state.")
 
     def submit(
         self,
