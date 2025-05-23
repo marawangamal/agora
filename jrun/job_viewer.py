@@ -17,9 +17,10 @@ class JobViewer(JobDB):
             print("No jobs found.")
             return
 
-        print("=" * 40)
+        border_width = 100
+        print("=" * border_width)
         print("Job Dependencies:")
-        print("=" * 40)
+        print("=" * border_width)
 
         job_statuses = {job.job_id: job.status for job in jobs}
 
@@ -36,10 +37,14 @@ class JobViewer(JobDB):
         total = len(jobs)
         done = status_counts.get("COMPLETED", 0)
         failed = sum(status_counts[s] for s in ("FAILED", "CANCELLED", "TIMEOUT"))
+        running = status_counts.get("RUNNING", 0)
+        pending = status_counts.get("PENDING", 0)
         pct = 100 * done / total
-        print("-" * 40)
-        print(f"{done}/{total} ({pct:.1f}%) completed | {failed} failed")
-        print("=" * 40)
+        print("-" * border_width)
+        print(
+            f"{done}/{total} ({pct:.1f}%) completed | {running} running | {pending} pending | {failed} failed"
+        )
+        print("=" * border_width)
 
     def visualize_mermaid(self) -> None:
         jobs = self.get_jobs()
