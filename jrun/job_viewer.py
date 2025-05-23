@@ -149,15 +149,16 @@ class JobViewer(JobDB):
             "IDS",
             "GROUP",
             "PROG",
-            "✅",
-            "▶️",
-            "⏸️",
-            "❌",
-            "⛔",
+            "C",
+            "R",
+            "PD",
+            "F",
+            "B",
             "COMMAND",
             "DEPENDENCIES",
         ]
         table_data = []
+        col_widths = [40, 10] + [20] * 6 + [80, 80]
         for group in self._group_jobs(jobs).values():
             id = self._smart_range_display([j.job_id for j in group])
             group_name = group[0].group_name or "root"
@@ -182,6 +183,7 @@ class JobViewer(JobDB):
         table_str = tabulate(
             table_data,
             headers=headers,
+            maxcolwidths=col_widths,
         )
 
         # Calculate actual table width from the first line (header border)
