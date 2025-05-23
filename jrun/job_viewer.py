@@ -119,7 +119,7 @@ class JobViewer(JobDB):
             status[k] for k in status.keys() if k not in ["running", "pending", "total"]
         )
         status_str = (
-            f"{finished}/{status['total']} ({100 * status['completed'] // status['total']:.1f}%) "
+            f"{finished}/{status['total']} ({100 * finished // status['total']:.1f}%) "
             + " | ".join(
                 f"{status[k]} {k.lower()}"
                 for k in ["running", "pending", "blocked", "failed"]
