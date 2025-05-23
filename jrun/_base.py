@@ -2,7 +2,7 @@ import datetime
 import json
 import os
 import sqlite3
-from typing import Any, Callable, Dict, List, Optional, Union
+from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
 from jrun.interfaces import JobSpec, PGroup, PJob
 
@@ -94,6 +94,18 @@ class JobDB:
             preamble=preamble,
         )
 
+    @staticmethod
+    def _parse_filter(filter_str: str) -> Tuple[str, Any]:
+        """Parse filter like 'status=COMPLETED' or 'command~python'"""
+        if "~" in filter_str:
+            field, value = filter_str.split("~", 1)
+            return f"{field} LIKE ?", f"%{value}%"
+        elif "=" in filter_str:
+            field, value = filter_str.split("=", 1)
+            return f"{field} = ?", value
+        else:
+            raise ValueError(f"Invalid filter: {filter_str}")
+
     def insert_record(self, rec: JobSpec) -> None:
         """Insert a new job row (fails if job_id already exists)."""
         now = datetime.datetime.utcnow().isoformat(timespec="seconds")
@@ -164,20 +176,49 @@ class JobDB:
                 return job
         return None
 
-    def get_jobs(self) -> List[JobSpec]:
-        """Get all jobs in the database."""
+    def get_jobs(self, filters: Optional[List[str]] = None) -> List[JobSpec]:
+        """Get jobs with optional filters."""
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
 
         # Get basic job information
-        cursor.execute(
-            "SELECT job_id, command, preamble, group_name, depends_on FROM jobs ORDER BY created_at ASC"
-        )
+        query = "SELECT job_id, command, preamble, group_name, depends_on FROM jobs"
+        params = []
+
+        # Remove status from filters
+        status_filter = None
+        if filters:
+            conditions = []
+            for f in filters:
+                if f.startswith("status"):
+                    status_filter = f
+                    continue
+                condition, param = self._parse_filter(f)
+                conditions.append(condition)
+                params.append(param)
+
+            if conditions:
+                query += " WHERE " + " AND ".join(conditions)
+
+        query += " ORDER BY created_at ASC"
+
+        cursor.execute(query, params)
         jobs = cursor.fetchall()
         job_ids = [job[0] for job in jobs]
+
+        # Get job statuses from SLURM
         job_statuses = self._get_job_statuses(job_ids)
 
         conn.close()
+
+        # Filter out jobs based on status filter
+        if status_filter:
+            field, value = self._parse_filter(status_filter)
+            jobs = [
+                job
+                for job in jobs
+                if job_statuses.get(str(job[0]), "UNKNOWN").lower() == value.lower()
+            ]
 
         return [
             JobSpec(

@@ -170,6 +170,22 @@ group:
         command: "python eval.py --group_id {group_id}" # (e.g., aaa-bbb)
 ```
 
+# 🌳 JRun Features & Status
+
+## Current Features
+- [x] Submit job trees from YAML files (`jrun submit --file workflow.yaml`)
+- [x] Monitor job status with visualization (`jrun status`, `jrun viz`)
+- [x] Parameter sweeps and parallel job execution
+- [x] Job graph vizualization
+- [ ] CLI filtering (`jrun status --filter status=COMPLETED`)
+- [ ] Job retry (`jrun retry JOB_ID`)
+
+## Planned Features
+- [ ] Job node removal (`jrun remove JOB_ID`)
+- [ ] Real-time monitoring (`jrun watch`)
+<!-- - Resource usage tracking and reporting
+- Web dashboard for team collaboration -->
+
 ## Requirements
 
 - Python 3.6+

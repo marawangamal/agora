@@ -1,3 +1,4 @@
+from typing import List, Optional
 from tabulate import tabulate
 from collections import Counter, defaultdict
 from html import escape
@@ -9,9 +10,9 @@ class JobViewer(JobDB):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-    def visualize(self):
+    def visualize(self, filters: Optional[List[str]] = None) -> None:
         """Display a compact dependency visualization."""
-        jobs = self.get_jobs()
+        jobs = self.get_jobs(filters=filters)
 
         if not jobs:
             print("No jobs found.")
@@ -46,7 +47,7 @@ class JobViewer(JobDB):
         )
         print("=" * border_width)
 
-    def visualize_mermaid(self) -> None:
+    def visualize_mermaid(self, filters: Optional[List[str]] = None) -> None:
         jobs = self.get_jobs()
         if not jobs:
             print("No jobs found.")
@@ -89,9 +90,12 @@ class JobViewer(JobDB):
             "\nPaste the code block above into https://mermaid.live (or any Markdown viewer with Mermaid support) to render the diagram."
         )
 
-    def status(self):
+    def status(self, filters: Optional[List[str]] = None) -> None:
         """Display a simple job status table using tabulate."""
-        jobs = self.get_jobs()
+        jobs = self.get_jobs(filters=filters)
+        if not jobs:
+            print("No jobs found.")
+            return
         table_data = []
         for job in jobs:
             table_data.append([job.job_id, job.group_name, job.command, job.status])

@@ -54,6 +54,12 @@ def parse_args():
     # jrun status (get job status)
     p_status = sub.add_parser("status", help="Show job status table")
     p_status.add_argument("--db", default=default_db, help="SQLite DB path")
+    p_status.add_argument(
+        "--filters",
+        nargs="*",
+        help="Filter jobs (e.g, job_id=123  or command~train)",
+        default=None,
+    )
 
     # jrun sbatch (pass args straight to sbatch)
     p_sbatch = sub.add_parser("sbatch", help="Pass args straight to sbatch")
@@ -62,6 +68,12 @@ def parse_args():
     # jrun viz (visualize job dependencies)
     p_viz = sub.add_parser("viz", help="Visualize job dependencies")
     p_viz.add_argument("--db", default=default_db, help="SQLite DB path")
+    p_viz.add_argument(
+        "--filters",
+        nargs="*",
+        help="Filter jobs (e.g, job_id=123  or command~train)",
+        default=None,
+    )
     p_viz.add_argument(
         "--mode",
         choices=["main", "mermaid"],
@@ -130,7 +142,7 @@ def main():
     # Show job statuses
     elif args.cmd == "status":
         jr = JobViewer(args.db)
-        jr.status()
+        jr.status(args.filters)
 
     # Visualize job dependencies
     elif args.cmd == "viz":
@@ -139,7 +151,7 @@ def main():
             "main": jr.visualize,
             "mermaid": jr.visualize_mermaid,
         }[args.mode]
-        viz_fn()
+        viz_fn(args.filters)
 
     # Pass args straight to sbatch
     elif args.cmd == "sbatch":
