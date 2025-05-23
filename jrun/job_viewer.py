@@ -205,7 +205,6 @@ class JobViewer(JobDB):
         )
 
         # Calculate actual table width from the first line (header border)
-        # Method 3: Simple - just use max line length with safety check
         table_lines = [line for line in table_str.split("\n") if line.strip()]
         table_width = max(len(line) for line in table_lines) if table_lines else 80
 
@@ -215,7 +214,7 @@ class JobViewer(JobDB):
         print(self._get_footer(jobs))
 
     def visualize_mermaid(self, filters: Optional[List[str]] = None) -> None:
-        jobs = self.get_jobs()
+        jobs = self.get_jobs(filters)
         if not jobs:
             print("No jobs found.")
             return
