@@ -50,7 +50,6 @@ class JobViewer(JobDB):
             cmd = cmd.replace('"', "'")
             return cmd[: n - 1] + "…" if len(cmd) > n else cmd
 
-        print("```mermaid")
         print("stateDiagram-v2")
 
         # Nodes
@@ -71,9 +70,8 @@ class JobViewer(JobDB):
                 if dep in id_map:
                     print(f"    {id_map[dep]} --> {id_map[job.job_id]}")
 
-        print("```")
         print(
-            "\nPaste the fenced block above into mermaid.live (or any Markdown viewer with Mermaid support) to render the diagram."
+            "\nPaste the code block above into https://mermaid.live to render the diagram."
         )
 
     def status(self):
