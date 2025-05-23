@@ -74,10 +74,10 @@ class JobViewer(JobDB):
             )
 
             if is_continuous:
-                return f"{job_ids[0]}-{job_ids[-1]}"
+                return f"{job_ids[0]}-{job_ids[-1]} ({len(job_ids)})"
             else:
                 # Has gaps - show first, last, and count
-                return f"{job_ids[0]}...{job_ids[-1]} ({len(job_ids)} jobs)"
+                return f"{job_ids[0]}...{job_ids[-1]} ({len(job_ids)})"
 
     def _get_status_color(self, status: str) -> str:
         """Get ANSI color code for job status."""
@@ -99,11 +99,15 @@ class JobViewer(JobDB):
         running = status_counts.get("RUNNING", 0)
         pending = status_counts.get("PENDING", 0)
         blocked = status_counts.get("BLOCKED", 0)
+        cancelled = status_counts.get("CANCELLED", 0)
+        timeout = status_counts.get("TIMEOUT", 0)
         return {
             "completed": done,
             "running": running,
             "pending": pending,
             "blocked": blocked,
+            "cancelled": cancelled,
+            "timeout": timeout,
             "failed": failed,
             "total": total,
         }
@@ -111,8 +115,11 @@ class JobViewer(JobDB):
     def _get_footer(self, jobs: List[JobSpec]) -> str:
         """Generate a footer with job status summary."""
         status = self._get_status_totals(jobs)
+        finished = sum(
+            status[k] for k in status.keys() if k not in ["running", "pending", "total"]
+        )
         status_str = (
-            f"{status['completed']}/{status['total']} ({100 * status['completed'] // status['total']:.1f}%)"
+            f"{finished}/{status['total']} ({100 * status['completed'] // status['total']:.1f}%) "
             + " | ".join(
                 f"{status[k]} {k.lower()}"
                 for k in ["running", "pending", "blocked", "failed"]
@@ -157,9 +164,10 @@ class JobViewer(JobDB):
             return
 
         headers = [
-            "ID",
+            "IDS",
             "GROUP",
             "PROG",
+            "✅",
             "▶️",
             "⏸️",
             "❌",
@@ -178,10 +186,15 @@ class JobViewer(JobDB):
                     f'{status["completed"]:>2}/{status["total"]:<2} '
                     f'{int(status["completed"]/status["total"]*100):>3}% '
                 )
-            ] + [status[k] for k in ["running", "pending", "failed", "blocked"]]
+            ] + [
+                status[k]
+                for k in ["completed", "running", "pending", "failed", "blocked"]
+            ]
 
             cmd = group[0].command[:25] + ("..." if len(group[0].command) > 25 else "")
-            deps = self._smart_range_display(group[0].depends_on)  # i.e., parents
+            deps = self._smart_range_display(
+                group[0].depends_on  # type:ignore
+            )  #  (i.e., parents)
             table_data.append([id, group_name, *stat_arr, cmd, deps])
 
         # Print table using tabulate
