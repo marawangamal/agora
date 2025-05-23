@@ -22,7 +22,6 @@
 
 ```mermaid
 stateDiagram-v2
-stateDiagram-v2
     state "⏸️ 6868382<br/><code>python main.py train --accel_strategy fsdp --data…</code>" as S6868382
     state "⏸️ 6868383<br/><code>python main.py train --accel_strategy fsdp --data…</code>" as S6868383
     state "⏸️ 6868384<br/><code>python main.py train --accel_strategy fsdp --data…</code>" as S6868384
