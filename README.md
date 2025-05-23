@@ -183,6 +183,7 @@ group:
 ## Planned Features
 - [ ] Job node removal (`jrun remove JOB_ID`)
 - [ ] Real-time monitoring (`jrun watch`)
+- [ ] Add `blocked` jobs count to visalization
 <!-- - Resource usage tracking and reporting
 - Web dashboard for team collaboration -->
 

@@ -1,14 +1,114 @@
-from typing import List, Optional
+from typing import Dict, List, Literal, Optional, Tuple, Union
 from tabulate import tabulate
 from collections import Counter, defaultdict
 from html import escape
 
 from jrun._base import JobDB
+from jrun.interfaces import JobSpec
+
+SABBRV = {
+    "COMPLETED": "✅",
+    "FAILED": "❌",
+    "CANCELLED": "❌",
+    "PENDING": "⏸️",
+    "RUNNING": "▶️",
+    "TIMEOUT": "⌛",
+    "BLOCKED": "⛔",
+}
 
 
 class JobViewer(JobDB):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+
+    def _group_jobs(
+        self, jobs: List[JobSpec]
+    ) -> Dict[Tuple[frozenset, frozenset], List[JobSpec]]:
+        """Group jobs that have the same parents and children."""
+        # Build dependency graph (parent -> children)
+        parent_to_child_map = defaultdict(set)
+        for job in jobs:
+            for dep in job.depends_on:
+                parent_to_child_map[dep].add(job.job_id)
+
+        # Group jobs by their full dependency signature
+        groups = defaultdict(list)
+        for job in jobs:
+            parents = frozenset(job.depends_on)
+            children = frozenset(parent_to_child_map.get(job.job_id, set()))
+            groups[(parents, children)].append(job)
+
+        return groups
+
+    def _smart_range_display(self, job_ids_mixed: List[Union[int, str]]) -> str:
+        """Create a smart range display that handles gaps."""
+        job_ids = [int(job_id) for job_id in job_ids_mixed]
+        job_ids = sorted(job_ids)
+
+        if len(job_ids) == 1:
+            return str(job_ids[0])
+        elif len(job_ids) <= 3:
+            return ",".join(map(str, job_ids))
+        else:
+            # Check if it's a continuous range
+            is_continuous = all(
+                job_ids[i] == job_ids[i - 1] + 1 for i in range(1, len(job_ids))
+            )
+
+            if is_continuous:
+                return f"{job_ids[0]}-{job_ids[-1]} ({len(job_ids)})"
+            else:
+                # Has gaps - show first, last, and count
+                return f"{job_ids[0]}...{job_ids[-1]} ({len(job_ids)})"
+
+    def _get_status_color(self, status: str) -> str:
+        """Get ANSI color code for job status."""
+        color_map = {
+            "COMPLETED": "\033[92m",  # Green
+            "RUNNING": "\033[94m",  # Blue
+            "PENDING": "\033[93m",  # Yellow
+            "FAILED": "\033[91m",  # Red
+            "CANCELLED": "\033[95m",  # Magenta
+            "TIMEOUT": "\033[91m",  # Red
+        }
+        return color_map.get(status, "\033[90m")  # Gray for unknown
+
+    def _get_status_totals(self, jobs: List[JobSpec]):
+        status_counts = Counter(job.status for job in jobs)
+        total = len(jobs)
+        done = status_counts.get("COMPLETED", 0)
+        failed = sum(status_counts[s] for s in ("FAILED", "CANCELLED", "TIMEOUT"))
+        running = status_counts.get("RUNNING", 0)
+        pending = status_counts.get("PENDING", 0)
+        blocked = status_counts.get("BLOCKED", 0)
+        cancelled = status_counts.get("CANCELLED", 0)
+        timeout = status_counts.get("TIMEOUT", 0)
+        return {
+            "completed": done,
+            "running": running,
+            "pending": pending,
+            "blocked": blocked,
+            "cancelled": cancelled,
+            "timeout": timeout,
+            "failed": failed,
+            "total": total,
+        }
+
+    def _get_footer(self, jobs: List[JobSpec]) -> str:
+        """Generate a footer with job status summary."""
+        status = self._get_status_totals(jobs)
+        finished = sum(
+            status[k] for k in status.keys() if k not in ["running", "pending", "total"]
+        )
+        status_str = (
+            f"{finished}/{status['total']} ({100 * finished // status['total']:.1f}%) "
+            + " | ".join(
+                f"{status[k]} {k.lower()}"
+                for k in ["running", "pending", "blocked", "failed"]
+                if status[k]
+            )
+        )
+        return status_str
 
     def visualize(self, filters: Optional[List[str]] = None) -> None:
         """Display a compact dependency visualization."""
@@ -34,21 +134,69 @@ class JobViewer(JobDB):
                 f"{job.job_id} [{job.group_name}]: ({status_color}{status}\033[0m): {cmd}{deps}"
             )
 
-        status_counts = Counter(job.status for job in jobs)
-        total = len(jobs)
-        done = status_counts.get("COMPLETED", 0)
-        failed = sum(status_counts[s] for s in ("FAILED", "CANCELLED", "TIMEOUT"))
-        running = status_counts.get("RUNNING", 0)
-        pending = status_counts.get("PENDING", 0)
-        pct = 100 * done / total
         print("-" * border_width)
-        print(
-            f"{done}/{total} ({pct:.1f}%) completed | {running} running | {pending} pending | {failed} failed"
-        )
+        print(self._get_footer(jobs))
         print("=" * border_width)
 
+    def visualize_grouped(self, filters: Optional[List[str]] = None) -> None:
+        """Display grouped job dependencies."""
+        jobs = self.get_jobs(filters=filters)
+        if not jobs:
+            print("No jobs found.")
+            return
+
+        headers = [
+            "IDS",
+            "GROUP",
+            "PROG",
+            "C",
+            "R",
+            "PD",
+            "F",
+            "B",
+            "COMMAND",
+            "DEPENDENCIES",
+        ]
+        table_data = []
+        col_widths = [40, 10] + [20] * 6 + [80, 80]
+        for group in self._group_jobs(jobs).values():
+            id = self._smart_range_display([j.job_id for j in group])
+            group_name = group[0].group_name or "root"
+            status = self._get_status_totals(group)
+            stat_arr = [
+                (
+                    f'{status["completed"]:>2}/{status["total"]:<2} '
+                    f'{int(status["completed"]/status["total"]*100):>3}% '
+                )
+            ] + [
+                status[k]
+                for k in ["completed", "running", "pending", "failed", "blocked"]
+            ]
+
+            cmd = group[0].command[:25] + ("..." if len(group[0].command) > 25 else "")
+            deps = self._smart_range_display(
+                group[0].depends_on  # type:ignore
+            )  #  (i.e., parents)
+            table_data.append([id, group_name, *stat_arr, cmd, deps])
+
+        # Print table using tabulate
+        table_str = tabulate(
+            table_data,
+            headers=headers,
+            maxcolwidths=col_widths,
+        )
+
+        # Calculate actual table width from the first line (header border)
+        table_lines = [line for line in table_str.split("\n") if line.strip()]
+        table_width = max(len(line) for line in table_lines) if table_lines else 80
+
+        # Print table
+        print("\n" + table_str)
+        print("-" * table_width)
+        print(self._get_footer(jobs))
+
     def visualize_mermaid(self, filters: Optional[List[str]] = None) -> None:
-        jobs = self.get_jobs()
+        jobs = self.get_jobs(filters)
         if not jobs:
             print("No jobs found.")
             return
@@ -111,14 +259,7 @@ class JobViewer(JobDB):
             )
         )
 
-    def _get_status_color(self, status: str) -> str:
-        """Get ANSI color code for job status."""
-        color_map = {
-            "COMPLETED": "\033[92m",  # Green
-            "RUNNING": "\033[94m",  # Blue
-            "PENDING": "\033[93m",  # Yellow
-            "FAILED": "\033[91m",  # Red
-            "CANCELLED": "\033[95m",  # Magenta
-            "TIMEOUT": "\033[91m",  # Red
-        }
-        return color_map.get(status, "\033[90m")  # Gray for unknown
+        border_width = 100
+        print("-" * border_width)
+        print(self._get_footer(jobs))
+        print("=" * border_width)

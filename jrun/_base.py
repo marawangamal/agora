@@ -60,13 +60,63 @@ class JobDB:
                 return str(job_id)
 
         statuses = {}
-        for job_id in [fmt_job_id(job_id) for job_id in job_ids]:
-            try:
-                out = os.popen("sacct -j {} --format state".format(job_id)).read()
-                status = out.split("\n")[2].strip()
-                statuses[job_id] = on_add_status(status) if on_add_status else status
-            except:
-                statuses[job_id] = "UNKNOWN"
+        formatted_job_ids = [fmt_job_id(job_id) for job_id in job_ids]
+
+        if not formatted_job_ids:
+            return statuses
+
+        try:
+            # Get all job statuses and reasons in one call
+            job_list = ",".join(formatted_job_ids)
+            out = os.popen(
+                f"squeue -j {job_list} --format='%i %T %r' --noheader"
+            ).read()
+
+            # Parse squeue output
+            for line in out.strip().split("\n"):
+                if line.strip():
+                    parts = line.strip().split()
+                    if len(parts) >= 2:
+                        job_id = parts[0]
+                        status = parts[1]
+                        reason = " ".join(parts[2:]) if len(parts) > 2 else ""
+
+                        # Convert PENDING with DependencyNeverSatisfied to BLOCKED
+                        if status == "PENDING" and "DependencyNeverSatisfied" in reason:
+                            status = "BLOCKED"
+
+                        statuses[job_id] = (
+                            on_add_status(status) if on_add_status else status
+                        )
+
+            # For jobs not found in squeue (completed, failed, etc), fall back to sacct
+            missing_jobs = set(formatted_job_ids) - set(statuses.keys())
+            for job_id in missing_jobs:
+                try:
+                    out = os.popen(
+                        f"sacct -j {job_id} --format state --noheader"
+                    ).read()
+                    status = out.strip().split("\n")[0].strip()
+                    statuses[job_id] = (
+                        on_add_status(status) if on_add_status else status
+                    )
+                except:
+                    statuses[job_id] = "UNKNOWN"
+
+        except:
+            # Fallback to individual sacct calls if squeue fails
+            for job_id in formatted_job_ids:
+                try:
+                    out = os.popen(
+                        f"sacct -j {job_id} --format state --noheader"
+                    ).read()
+                    status = out.strip().split("\n")[0].strip()
+                    statuses[job_id] = (
+                        on_add_status(status) if on_add_status else status
+                    )
+                except:
+                    statuses[job_id] = "UNKNOWN"
+
         return statuses
 
     def _parse_group_dict(self, d: Dict[str, Any]) -> PGroup:

@@ -76,7 +76,7 @@ def parse_args():
     )
     p_viz.add_argument(
         "--mode",
-        choices=["main", "mermaid"],
+        choices=["main", "mermaid", "group"],
         default="main",
         help="Visualization mode",
     )
@@ -150,6 +150,7 @@ def main():
         viz_fn = {
             "main": jr.visualize,
             "mermaid": jr.visualize_mermaid,
+            "group": jr.visualize_grouped,
         }[args.mode]
         viz_fn(args.filters)
 
