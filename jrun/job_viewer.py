@@ -21,24 +21,6 @@ class JobViewer(JobDB):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-    # def _group_jobs_by_children(
-    #     self, jobs: List[JobSpec]
-    # ) -> dict[List[str], List[JobSpec]]:
-    #     """Group jobs that have the same set of children."""
-    #     # Build dependency graph (parent -> children)
-    #     children_map = defaultdict(set)
-    #     for job in jobs:
-    #         for dep in job.depends_on:
-    #             children_map[dep].add(job.job_id)
-
-    #     # Group jobs by their children sets
-    #     children_to_jobs = defaultdict(list)
-    #     for job in jobs:
-    #         children = frozenset(children_map.get(job.job_id, set()))
-    #         children_to_jobs[children].append(job)
-
-    #     return children_to_jobs
-
     def _group_jobs(
         self, jobs: List[JobSpec]
     ) -> Dict[Tuple[frozenset, frozenset], List[JobSpec]]:
@@ -176,7 +158,6 @@ class JobViewer(JobDB):
             "DEPENDENCIES",
         ]
         table_data = []
-        col_widths = [40, 10, 40, 80, 80]
         for group in self._group_jobs(jobs).values():
             id = self._smart_range_display([j.job_id for j in group])
             group_name = group[0].group_name or "root"
@@ -201,7 +182,6 @@ class JobViewer(JobDB):
         table_str = tabulate(
             table_data,
             headers=headers,
-            maxcolwidths=col_widths,
         )
 
         # Calculate actual table width from the first line (header border)
