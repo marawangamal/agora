@@ -1,5 +1,5 @@
 from tabulate import tabulate
-from collections import defaultdict
+from collections import Counter, defaultdict
 from html import escape
 
 from jrun._base import JobDB
@@ -17,7 +17,8 @@ class JobViewer(JobDB):
             print("No jobs found.")
             return
 
-        print("\nJob Dependencies:")
+        print("=" * 40)
+        print("Job Dependencies:")
         print("=" * 40)
 
         job_statuses = {job.job_id: job.status for job in jobs}
@@ -30,6 +31,15 @@ class JobViewer(JobDB):
             print(
                 f"{job.job_id} [{job.group_name}]: ({status_color}{status}\033[0m): {cmd}{deps}"
             )
+
+        status_counts = Counter(job.status for job in jobs)
+        total = len(jobs)
+        done = status_counts.get("COMPLETED", 0)
+        failed = sum(status_counts[s] for s in ("FAILED", "CANCELLED", "TIMEOUT"))
+        pct = 100 * done / total
+        print("-" * 40)
+        print(f"{done}/{total} ({pct:.1f}%) completed | {failed} failed")
+        print("=" * 40)
 
     def visualize_mermaid(self) -> None:
         jobs = self.get_jobs()
@@ -71,7 +81,7 @@ class JobViewer(JobDB):
                     print(f"    {id_map[dep]} --> {id_map[job.job_id]}")
 
         print(
-            "\nPaste the code block above into https://mermaid.live to render the diagram."
+            "\nPaste the code block above into https://mermaid.live (or any Markdown viewer with Mermaid support) to render the diagram."
         )
 
     def status(self):
