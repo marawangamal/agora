@@ -500,6 +500,7 @@ class TestJrunSimple(unittest.TestCase):
                         "job": {
                             "preamble": "gpu",
                             "command": "echo 'Third job' --group_id {group_id}",
+                            "name": "c",
                         }
                     },
                 ],
@@ -519,8 +520,10 @@ class TestJrunSimple(unittest.TestCase):
         for job in jobs:
             if job.command.startswith("echo 'First job'"):
                 self.assertEqual(job.group_name, "a:b")
-            else:
+            elif job.command.startswith("echo 'Second job'"):
                 self.assertEqual(job.group_name, "a")
+            elif job.command.startswith("echo 'Third job'"):
+                self.assertEqual(job.group_name, "a:c")
 
 
 if __name__ == "__main__":

@@ -6,7 +6,7 @@ import re
 import subprocess
 import tempfile
 import time
-from typing import Any, Callable, Dict, List, Optional, Union
+from typing import Callable, Dict, List, Optional, Union
 
 import yaml
 from jrun._base import JobDB
@@ -218,9 +218,9 @@ class JobSubmitter(JobDB):
         elif node.type == "sequential":
             # Sequential group
             for i, entry in enumerate(node.jobs):
-                group_name_i = copy.deepcopy(group_name)
-                if isinstance(entry, PGroup):
-                    group_name_i = ":".join([p for p in [group_name, entry.name] if p])
+                group_name_i = ":".join(
+                    [p for p in [copy.deepcopy(group_name), entry.name] if p]
+                )
                 job_ids = self.walk(
                     entry,
                     debug=debug,
@@ -241,9 +241,9 @@ class JobSubmitter(JobDB):
             # Parallel group
             parallel_job_ids = []
             for entry in node.jobs:
-                group_name_i = copy.deepcopy(group_name)
-                if isinstance(entry, PGroup):
-                    group_name_i = ":".join([p for p in [group_name, entry.name] if p])
+                group_name_i = ":".join(
+                    [p for p in [copy.deepcopy(group_name), entry.name] if p]
+                )
                 job_ids = self.walk(
                     entry,
                     debug=debug,

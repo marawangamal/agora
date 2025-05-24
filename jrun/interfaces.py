@@ -63,12 +63,7 @@ class JobSpec:
 class PJob:
     preamble: str
     command: str
-
-
-@dataclass
-class SJob:
-    preamble: str
-    command: str
+    name: str = ""
 
 
 @dataclass

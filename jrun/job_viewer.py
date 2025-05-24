@@ -104,7 +104,7 @@ class JobViewer(JobDB):
             f"{finished}/{status['total']} ({100 * finished // status['total']:.1f}%) "
             + " | ".join(
                 f"{status[k]} {k.lower()}"
-                for k in ["running", "pending", "blocked", "failed"]
+                for k in ["completed", "running", "pending", "blocked", "failed"]
                 if status[k]
             )
         )
