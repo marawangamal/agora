@@ -218,6 +218,9 @@ class JobSubmitter(JobDB):
         elif node.type == "sequential":
             # Sequential group
             for i, entry in enumerate(node.jobs):
+                group_name_i = copy.deepcopy(group_name)
+                if isinstance(entry, PGroup):
+                    group_name_i = ":".join([p for p in [group_name, entry.name] if p])
                 job_ids = self.walk(
                     entry,
                     debug=debug,
@@ -228,6 +231,7 @@ class JobSubmitter(JobDB):
                     submitted_jobs=submitted_jobs,
                     submit_fn=submit_fn,
                     group_id=copy.deepcopy(group_id),
+                    group_name=group_name_i,
                 )
                 if job_ids:
                     depends_on.extend(job_ids)
@@ -237,6 +241,9 @@ class JobSubmitter(JobDB):
             # Parallel group
             parallel_job_ids = []
             for entry in node.jobs:
+                group_name_i = copy.deepcopy(group_name)
+                if isinstance(entry, PGroup):
+                    group_name_i = ":".join([p for p in [group_name, entry.name] if p])
                 job_ids = self.walk(
                     entry,
                     debug=debug,
@@ -245,6 +252,7 @@ class JobSubmitter(JobDB):
                     submitted_jobs=submitted_jobs,
                     submit_fn=submit_fn,
                     group_id=copy.deepcopy(group_id),
+                    group_name=group_name_i,
                 )
                 if job_ids:
                     parallel_job_ids.extend(job_ids)

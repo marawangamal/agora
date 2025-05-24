@@ -518,7 +518,7 @@ class TestJrunSimple(unittest.TestCase):
         jobs = viewer.get_jobs()
         for job in jobs:
             if job.command.startswith("echo 'First job'"):
-                self.assertEqual(job.group_name, "b")
+                self.assertEqual(job.group_name, "a:b")
             else:
                 self.assertEqual(job.group_name, "a")
 
