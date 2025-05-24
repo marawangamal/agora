@@ -53,7 +53,7 @@ class JobSubmitter(JobDB):
         # Create a temporary script file
         with tempfile.NamedTemporaryFile(mode="w", suffix=".sh", delete=False) as f:
             script_path = f.name
-            f.write(job_spec.to_script())
+            f.write(job_spec.to_script(deptype=self.deptype))
 
         try:
             # Check if the job is already submitted
@@ -179,7 +179,7 @@ class JobSubmitter(JobDB):
             )
             job.command = job.command.format(group_id=group_id)
             if debug:
-                print(f"\nDEBUG:\n{job.to_script()}\n")
+                print(f"\nDEBUG:\n{job.to_script(self.deptype)}\n")
             else:
                 job_id = submit_fn(job)
             submitted_jobs.append(job_id)
@@ -207,7 +207,7 @@ class JobSubmitter(JobDB):
                     depends_on=[str(_id) for _id in depends_on],
                 )
                 if debug:
-                    print(f"\nDEBUG:\n{job.to_script()}\n")
+                    print(f"\nDEBUG:\n{job.to_script(self.deptype)}\n")
                 else:
                     job_id = submit_fn(job)
                 submitted_jobs.append(job_id)

@@ -2,7 +2,7 @@ import datetime
 import json
 import os
 import sqlite3
-from typing import Any, Callable, Dict, List, Optional, Tuple, Union
+from typing import Any, Callable, Dict, List, Literal, Optional, Tuple, Union
 
 from jrun.interfaces import JobSpec, PGroup, PJob
 
@@ -10,13 +10,18 @@ from jrun.interfaces import JobSpec, PGroup, PJob
 class JobDB:
     """Track SLURM job status with support for complex job hierarchies."""
 
-    def __init__(self, db_path: str = "~/.cache/jobrunner/jobs.db"):
+    def __init__(
+        self,
+        db_path: str = "~/.cache/jobrunner/jobs.db",
+        deptype: Literal["afterok", "afterany"] = "afterok",
+    ):
         """Initialize the job tracker.
 
         Args:
             db_path: Path to SQLite database for job tracking
         """
         self.db_path = os.path.expanduser(db_path)
+        self.deptype: Literal["afterok", "afterany"] = deptype
         dir = os.path.dirname(self.db_path)
         if dir:
             os.makedirs(os.path.dirname(self.db_path), exist_ok=True)

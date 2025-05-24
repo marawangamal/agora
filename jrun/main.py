@@ -40,7 +40,7 @@ def parse_args():
     parser = argparse.ArgumentParser(prog="jrun", description="Tiny Slurm helper")
     sub = parser.add_subparsers(dest="cmd", required=True)
 
-    # jrun submit --file workflow.yaml (run all jobs in the workflow)
+    ###### jrun submit --file workflow.yaml (run all jobs in the workflow)
     p_submit = sub.add_parser("submit", help="Submit jobs from a YAML workflow")
     p_submit.add_argument("--file", required=True, help="Path to workflow.yaml")
     p_submit.add_argument("--db", default=default_db, help="SQLite DB path")
@@ -50,8 +50,11 @@ def parse_args():
     p_submit.add_argument(
         "--debug", action="store_true", help="Don't call sbatch, just print & record"
     )
+    p_submit.add_argument(
+        "--deptype", choices=["afterok", "afterany"], default="afterok"
+    )
 
-    # jrun status (get job status)
+    ###### jrun status (get job status)
     p_status = sub.add_parser("status", help="Show job status table")
     p_status.add_argument("--db", default=default_db, help="SQLite DB path")
     p_status.add_argument(
@@ -61,11 +64,11 @@ def parse_args():
         default=None,
     )
 
-    # jrun sbatch (pass args straight to sbatch)
+    ###### jrun sbatch (pass args straight to sbatch)
     p_sbatch = sub.add_parser("sbatch", help="Pass args straight to sbatch")
     p_sbatch.add_argument("--db", default=default_db, help="SQLite DB path")
 
-    # jrun viz (visualize job dependencies)
+    ###### jrun viz (visualize job dependencies)
     p_viz = sub.add_parser("viz", help="Visualize job dependencies")
     p_viz.add_argument("--db", default=default_db, help="SQLite DB path")
     p_viz.add_argument(
@@ -81,7 +84,7 @@ def parse_args():
         help="Visualization mode",
     )
 
-    # jrun cancel (stop jobs)
+    ###### jrun cancel (stop jobs)
     p_cancel = sub.add_parser("cancel", help="Cancel jobs")
     p_cancel.add_argument(
         "job_ids",
@@ -92,11 +95,11 @@ def parse_args():
         "--db", default=default_db, help=f"SQLite DB path (default: {default_db})"
     )
 
-    # jrun delete
+    ###### jrun delete
     p_clean = sub.add_parser("delete", help="Clear up the database")
     p_clean.add_argument("--db", default=default_db, help="SQLite DB path")
 
-    # jrun retry (resubmit jobs)
+    ###### jrun retry (resubmit jobs)
     p_retry = sub.add_parser("retry", help="Retry jobs")
     p_retry.add_argument("--db", default=default_db, help="SQLite DB path")
     p_retry.add_argument(
@@ -112,6 +115,9 @@ def parse_args():
         "job_ids",
         nargs="*",  # Zero or more (optional)
         help="Job IDs to retry (space-separated)",
+    )
+    p_retry.add_argument(
+        "--deptype", choices=["afterok", "afterany"], default="afterok"
     )
 
     # ---------- Passthough for sbatch ----------
@@ -130,11 +136,11 @@ def main():
 
     # Submit yaml workflow
     if args.cmd == "submit":
-        jr = JobSubmitter(args.db)
+        jr = JobSubmitter(args.db, deptype=args.deptype)
         jr.submit(args.file, debug=args.debug, dry=args.dry)
 
     elif args.cmd == "retry":
-        jr = JobSubmitter(args.db)
+        jr = JobSubmitter(args.db, deptype=args.deptype)
         job_ids = [int(job_id) for job_id in args.job_ids]
         for job_id in job_ids:
             jr.retry(job_id, force=args.force)
