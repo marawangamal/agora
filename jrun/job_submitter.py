@@ -6,7 +6,7 @@ import re
 import subprocess
 import tempfile
 import time
-from typing import Any, Callable, Dict, List, Optional, Union
+from typing import Callable, Dict, List, Optional, Union
 
 import yaml
 from jrun._base import JobDB
@@ -53,7 +53,7 @@ class JobSubmitter(JobDB):
         # Create a temporary script file
         with tempfile.NamedTemporaryFile(mode="w", suffix=".sh", delete=False) as f:
             script_path = f.name
-            f.write(job_spec.to_script())
+            f.write(job_spec.to_script(deptype=self.deptype))
 
         try:
             # Check if the job is already submitted
@@ -179,7 +179,7 @@ class JobSubmitter(JobDB):
             )
             job.command = job.command.format(group_id=group_id)
             if debug:
-                print(f"\nDEBUG:\n{job.to_script()}\n")
+                print(f"\nDEBUG:\n{job.to_script(self.deptype)}\n")
             else:
                 job_id = submit_fn(job)
             submitted_jobs.append(job_id)
@@ -207,7 +207,7 @@ class JobSubmitter(JobDB):
                     depends_on=[str(_id) for _id in depends_on],
                 )
                 if debug:
-                    print(f"\nDEBUG:\n{job.to_script()}\n")
+                    print(f"\nDEBUG:\n{job.to_script(self.deptype)}\n")
                 else:
                     job_id = submit_fn(job)
                 submitted_jobs.append(job_id)
@@ -218,6 +218,9 @@ class JobSubmitter(JobDB):
         elif node.type == "sequential":
             # Sequential group
             for i, entry in enumerate(node.jobs):
+                group_name_i = ":".join(
+                    [p for p in [copy.deepcopy(group_name), entry.name] if p]
+                )
                 job_ids = self.walk(
                     entry,
                     debug=debug,
@@ -228,6 +231,7 @@ class JobSubmitter(JobDB):
                     submitted_jobs=submitted_jobs,
                     submit_fn=submit_fn,
                     group_id=copy.deepcopy(group_id),
+                    group_name=group_name_i,
                 )
                 if job_ids:
                     depends_on.extend(job_ids)
@@ -237,6 +241,9 @@ class JobSubmitter(JobDB):
             # Parallel group
             parallel_job_ids = []
             for entry in node.jobs:
+                group_name_i = ":".join(
+                    [p for p in [copy.deepcopy(group_name), entry.name] if p]
+                )
                 job_ids = self.walk(
                     entry,
                     debug=debug,
@@ -245,6 +252,7 @@ class JobSubmitter(JobDB):
                     submitted_jobs=submitted_jobs,
                     submit_fn=submit_fn,
                     group_id=copy.deepcopy(group_id),
+                    group_name=group_name_i,
                 )
                 if job_ids:
                     parallel_job_ids.extend(job_ids)

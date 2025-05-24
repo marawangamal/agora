@@ -1,5 +1,5 @@
 from dataclasses import asdict, dataclass, field
-from typing import List, Dict, Any, Union
+from typing import List, Dict, Any, Literal, Union
 
 
 @dataclass
@@ -18,7 +18,7 @@ class JobSpec:
         """Convert the dataclass instance to a dictionary."""
         return asdict(self)
 
-    def to_script(self) -> str:
+    def to_script(self, deptype: Literal["afterok", "afterany"] = "afterok") -> str:
         """Convert job spec to a SLURM script.
 
         Returns:
@@ -47,7 +47,7 @@ class JobSpec:
             ]
             if len(active_deps) != 0:
                 dependencies = ":".join(active_deps)
-                script_lines.append(f"#SBATCH --dependency=afterok:{dependencies}")
+                script_lines.append(f"#SBATCH --dependency={deptype}:{dependencies}")
 
         # Add setup commands
         if setup_lines:
@@ -63,12 +63,7 @@ class JobSpec:
 class PJob:
     preamble: str
     command: str
-
-
-@dataclass
-class SJob:
-    preamble: str
-    command: str
+    name: str = ""
 
 
 @dataclass
@@ -78,3 +73,4 @@ class PGroup:
     preamble: str = ""
     sweep: Dict[str, List[Any]] = field(default_factory=dict)
     sweep_template: str = ""
+    name: str = ""

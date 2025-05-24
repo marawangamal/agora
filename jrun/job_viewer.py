@@ -104,7 +104,7 @@ class JobViewer(JobDB):
             f"{finished}/{status['total']} ({100 * finished // status['total']:.1f}%) "
             + " | ".join(
                 f"{status[k]} {k.lower()}"
-                for k in ["running", "pending", "blocked", "failed"]
+                for k in ["completed", "running", "pending", "blocked", "failed"]
                 if status[k]
             )
         )
@@ -148,7 +148,7 @@ class JobViewer(JobDB):
         headers = [
             "IDS",
             "GROUP",
-            "PROG",
+            "PASS (PROG)",
             "C",
             "R",
             "PD",
@@ -163,10 +163,15 @@ class JobViewer(JobDB):
             id = self._smart_range_display([j.job_id for j in group])
             group_name = group[0].group_name or "root"
             status = self._get_status_totals(group)
+            finished = sum(
+                status[k]
+                for k in status.keys()
+                if k not in ["running", "pending", "total"]
+            )
             stat_arr = [
                 (
                     f'{status["completed"]:>2}/{status["total"]:<2} '
-                    f'{int(status["completed"]/status["total"]*100):>3}% '
+                    f'({int(finished/status["total"]*100):>3}%) '
                 )
             ] + [
                 status[k]

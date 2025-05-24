@@ -456,6 +456,75 @@ class TestJrunSimple(unittest.TestCase):
             group_id_first,
         )
 
+    @patch("os.popen")
+    def test_groupname_workflow(self, mock_popen):
+        """Test that jobs are submitted correctly."""
+
+        ##### Setup mocks
+        mock_popen.side_effect = self.get_popen_mock_fn()
+        viewer = JobViewer(self.db_path)
+        submitter = JobSubmitter(self.db_path)
+        root = {
+            "group": {
+                "name": "a",
+                "type": "sequential",
+                "jobs": [
+                    {
+                        "group": {
+                            "name": "b",
+                            "type": "parallel",
+                            "jobs": [
+                                {
+                                    "job": {
+                                        "preamble": "base",
+                                        "command": "echo 'First job' --group_id {group_id}",
+                                    }
+                                },
+                            ],
+                        }
+                    },
+                    {
+                        "group": {
+                            "type": "parallel",
+                            "jobs": [
+                                {
+                                    "job": {
+                                        "preamble": "gpu",
+                                        "command": "echo 'Second job' --group_id {group_id}",
+                                    }
+                                },
+                            ],
+                        }
+                    },
+                    {
+                        "job": {
+                            "preamble": "gpu",
+                            "command": "echo 'Third job' --group_id {group_id}",
+                            "name": "c",
+                        }
+                    },
+                ],
+            }
+        }
+
+        submitter.walk(
+            node=submitter._parse_group_dict(root["group"]),
+            group_name=root["group"]["name"],
+            preamble_map=self.preamble_map,
+            depends_on=[],
+            submitted_jobs=[],
+        )
+
+        # Verify submission
+        jobs = viewer.get_jobs()
+        for job in jobs:
+            if job.command.startswith("echo 'First job'"):
+                self.assertEqual(job.group_name, "a:b")
+            elif job.command.startswith("echo 'Second job'"):
+                self.assertEqual(job.group_name, "a")
+            elif job.command.startswith("echo 'Third job'"):
+                self.assertEqual(job.group_name, "a:c")
+
 
 if __name__ == "__main__":
     unittest.main()
