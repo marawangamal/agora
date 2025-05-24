@@ -126,6 +126,7 @@ class JobDB:
         preamble = d.get("preamble", "")
         sweep_template = d.get("sweep_template", "")
         children: List[Union[PGroup, PJob]] = []
+        name = d.get("name", "")
 
         for item in d.get("jobs", []):
             if "job" in item:  # leaf
@@ -142,6 +143,7 @@ class JobDB:
             sweep=sweep,
             sweep_template=sweep_template,
             preamble=preamble,
+            name=name,
         )
 
     @staticmethod
