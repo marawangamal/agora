@@ -75,7 +75,7 @@ class JobSubmitter(JobDB):
             # clean up
             if prev_job:
                 # remove the previous job from the database
-                self.delete_record(prev_job)
+                self.delete_record(prev_job.job_id)
 
             # add small delay
             time.sleep(0.1)
@@ -97,6 +97,18 @@ class JobSubmitter(JobDB):
         jobs = self.get_jobs()
         for job in jobs:
             self.cancel(job.job_id)
+
+    def delete(self, job_ids: Optional[List[int]] = None, cascade: bool = False):
+        """Delete jobs with the given job IDs."""
+        if job_ids is None:
+            # If no job IDs are provided, delete all jobs
+            job_ids = [job.job_id for job in self.get_jobs()]
+
+        for job_id in job_ids:
+            self.cancel(job_id)
+            self.delete_record(job_id)
+            if cascade:
+                self.delete([c.job_id for c in self.get_children(job_id)])
 
     def retry(self, job_id: int, job: Optional[JobSpec] = None, force: bool = False):
         """Retry a job with the given job ID."""

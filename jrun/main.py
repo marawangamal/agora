@@ -1,4 +1,5 @@
 import argparse
+from typing import Callable, Optional
 
 import appdirs
 from pathlib import Path
@@ -14,21 +15,27 @@ def get_default_db_path():
     return str(Path(app_data_dir) / "jrun.db")
 
 
-def handle_delete_db(db_path):
+def ask_user_yes_no_question(
+    question: str = "Are you sure you want to delete the database? (y/n): ",
+    on_yes: Optional[Callable] = None,
+    on_no: Optional[Callable] = None,
+):
     """Delete the database file if it exists."""
-    confirm = (
-        input("Are you sure you want to delete the database? (y/n): ").strip().lower()
-    )
+    confirm = input(question).strip().lower()
     if confirm == "y":
-        db_path = Path(db_path)
-        # Cancel all jobs before deleting the database
-        jr = JobSubmitter(db_path)
-        jr.cancel_all()
-        if db_path.exists():
-            db_path.unlink()
-            print(f"Deleted database at {db_path}")
+        # db_path = Path(db_path)
+        # # Cancel all jobs before deleting the database
+        # jr = JobSubmitter(db_path)
+        # jr.cancel_all()
+        # if db_path.exists():
+        #     db_path.unlink()
+        #     print(f"Deleted database at {db_path}")
+        if on_yes:
+            on_yes()
         else:
-            print(f"No database found at {db_path}, nothing to delete.")
+            # print(f"No database found at {db_path}, nothing to delete.")
+            if on_no:
+                on_no()
     else:
         print("Operation cancelled.")
 
@@ -98,6 +105,11 @@ def parse_args():
     ###### jrun delete
     p_clean = sub.add_parser("delete", help="Clear up the database")
     p_clean.add_argument("--db", default=default_db, help="SQLite DB path")
+    p_clean.add_argument(
+        "job_ids",
+        nargs="*",  # Zero or more (optional)
+        help="Job IDs to delete (space-separated)",
+    )
 
     ###### jrun retry (resubmit jobs)
     p_retry = sub.add_parser("retry", help="Retry jobs")
@@ -180,7 +192,15 @@ def main():
 
     # Delete the database
     elif args.cmd == "delete":
-        handle_delete_db(args.db)
+        jr = JobSubmitter(args.db)
+        if not args.job_ids:
+            # If no job IDs are provided, ask for confirmation to delete the database
+            ask_user_yes_no_question(
+                question="Are you sure you want to delete the database? (y/n): ",
+                on_yes=lambda: jr.delete(),
+                on_no=lambda: print("Database deletion cancelled."),
+            )
+        jr.delete(args.job_ids, cascade=True)
 
     # Cancel jobs
     elif args.cmd == "cancel":

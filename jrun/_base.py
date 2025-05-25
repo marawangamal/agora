@@ -192,13 +192,13 @@ class JobDB:
     def update_record(self, rec: JobSpec):
         pass
 
-    def delete_record(self, rec: JobSpec) -> None:
+    def delete_record(self, job_id: Union[int, str]) -> None:
         """Delete a job record from the database."""
         with sqlite3.connect(self.db_path) as conn:
             cur = conn.cursor()
             cur.execute(
                 "DELETE FROM jobs WHERE job_id = ?",
-                (str(rec.job_id),),
+                (str(job_id),),
             )
             conn.commit()
 
