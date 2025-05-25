@@ -177,13 +177,13 @@ group:
 - [x] Monitor job status with visualization (`jrun status`, `jrun viz`)
 - [x] Parameter sweeps and parallel job execution
 - [x] Job graph vizualization
-- [ ] CLI filtering (`jrun status --filter status=COMPLETED`)
-- [ ] Job retry (`jrun retry JOB_ID`)
+- [x] CLI filtering (`jrun status --filter status=COMPLETED`)
+- [x] Job retry (`jrun retry JOB_ID`)
 
 ## Planned Features
+- [ ] Job delete subgraph
 - [ ] Job node removal (`jrun remove JOB_ID`)
 - [ ] Real-time monitoring (`jrun watch`)
-- [ ] Add `blocked` jobs count to visalization
 <!-- - Resource usage tracking and reporting
 - Web dashboard for team collaboration -->
 
