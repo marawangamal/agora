@@ -1,3 +1,4 @@
+import json
 from typing import Dict, List, Literal, Optional, Tuple, Union
 from tabulate import tabulate
 from collections import Counter, defaultdict
@@ -242,6 +243,31 @@ class JobViewer(JobDB):
         print(
             "\nPaste the code block above into https://mermaid.live (or any Markdown viewer with Mermaid support) to render the diagram."
         )
+
+    def visualize_json(self, filters: Optional[List[str]] = None) -> None:
+        """Return job data as JSON for API consumption."""
+        jobs = self.get_jobs(filters=filters, ignore_status=True)
+
+        # Convert JobSpec objects to dictionaries
+        jobs_data = []
+        for job in jobs:
+            jobs_data.append(
+                {
+                    "job_id": job.job_id,
+                    "status": job.status,
+                    "command": job.command,
+                    "group_name": job.group_name,
+                    "depends_on": job.depends_on,
+                    "preamble": job.preamble,
+                }
+            )
+
+        # Add summary stats
+        stats = self._get_status_totals(jobs)
+
+        output = {"jobs": jobs_data, "stats": stats, "count": len(jobs_data)}
+
+        print(json.dumps(output, indent=2))
 
     def status(self, filters: Optional[List[str]] = None) -> None:
         """Display a simple job status table using tabulate."""

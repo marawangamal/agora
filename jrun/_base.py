@@ -233,7 +233,9 @@ class JobDB:
                 return job
         return None
 
-    def get_jobs(self, filters: Optional[List[str]] = None) -> List[JobSpec]:
+    def get_jobs(
+        self, filters: Optional[List[str]] = None, ignore_status: bool = False
+    ) -> List[JobSpec]:
         """Get jobs with optional filters."""
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
@@ -264,7 +266,10 @@ class JobDB:
         job_ids = [job[0] for job in jobs]
 
         # Get job statuses from SLURM
-        job_statuses = self._get_job_statuses(job_ids)
+        if not ignore_status:
+            job_statuses = self._get_job_statuses(job_ids)
+        else:
+            job_statuses = {str(job[0]): "UNKNOWN" for job in jobs}
 
         conn.close()
 
