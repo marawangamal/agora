@@ -6,6 +6,7 @@ from pathlib import Path
 
 from jrun.job_submitter import JobSubmitter
 from jrun.job_viewer import JobViewer
+from jrun.jweb_server import serve_web_interface
 
 
 def get_default_db_path():
@@ -132,6 +133,16 @@ def parse_args():
         "--deptype", choices=["afterok", "afterany"], default="afterok"
     )
 
+    ###### jrun serve (start web interface)
+    p_serve = sub.add_parser("serve", help="Start web interface server")
+    p_serve.add_argument(
+        "--port", type=int, default=3000, help="Port to serve on (default: 8080)"
+    )
+    p_serve.add_argument(
+        "--host", default="localhost", help="Host to bind to (default: localhost)"
+    )
+    p_serve.add_argument("--db", default=default_db, help="SQLite DB path")
+
     ###### jrun info
     p_info = sub.add_parser("info", help="Show jrun info")
     p_info.add_argument(
@@ -210,6 +221,21 @@ def main():
             return jr.cancel_all()
         for job_id in job_ids:
             jr.cancel(job_id)
+
+    # Start web server
+    elif args.cmd == "serve":
+        try:
+            serve_web_interface(
+                port=args.port,
+                host=args.host,
+                open_browser=False,
+                blocking=True,
+            )
+        except KeyboardInterrupt:
+            print("\n👋 Goodbye!")
+        except Exception as e:
+            print(f"❌ Failed to start server: {e}")
+            exit(1)
 
     # Show jrun data
     elif args.cmd == "data":
