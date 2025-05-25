@@ -79,7 +79,7 @@ def parse_args():
     )
     p_viz.add_argument(
         "--mode",
-        choices=["main", "mermaid", "group"],
+        choices=["main", "mermaid", "group", "json"],
         default="main",
         help="Visualization mode",
     )
@@ -120,6 +120,18 @@ def parse_args():
         "--deptype", choices=["afterok", "afterany"], default="afterok"
     )
 
+    ###### jrun info
+    p_info = sub.add_parser("info", help="Show jrun info")
+    p_info.add_argument(
+        "--db", default=default_db, help="SQLite DB path (default: jrun.db)"
+    )
+
+    ###### jrun data
+    p_data = sub.add_parser("data", help="Show jrun data")
+    p_data.add_argument(
+        "--db", default=default_db, help="SQLite DB path (default: jrun.db)"
+    )
+
     # ---------- Passthough for sbatch ----------
     args, unknown = parser.parse_known_args()
 
@@ -157,6 +169,7 @@ def main():
             "main": jr.visualize,
             "mermaid": jr.visualize_mermaid,
             "group": jr.visualize_grouped,
+            "json": jr.visualize_json,
         }[args.mode]
         viz_fn(args.filters)
 
@@ -177,6 +190,14 @@ def main():
             return jr.cancel_all()
         for job_id in job_ids:
             jr.cancel(job_id)
+
+    # Show jrun data
+    elif args.cmd == "data":
+        jr = JobViewer(args.db)
+
+    # Show jrun info
+    elif args.cmd == "info":
+        print(f"Using jrun database at {args.db}")
 
     else:
         print("Unknown command")
