@@ -4,36 +4,53 @@ import threading
 import webbrowser
 import subprocess
 import json
+import os
 from typing import Optional
-from urllib.parse import urlparse, parse_qs
+from urllib.parse import urlparse
 
 
-class SimpleHTTPRequestHandler(http.server.BaseHTTPRequestHandler):
-    """Simple HTTP request handler with error handling"""
+class ReactAppHandler(http.server.SimpleHTTPRequestHandler):
+    """Handler for serving React app with API endpoints"""
+
+    def __init__(self, *args, build_dir="build", **kwargs):
+        self.build_dir = build_dir
+        super().__init__(*args, directory=build_dir, **kwargs)
 
     def do_GET(self):
         """Handle GET requests"""
         try:
             parsed_url = urlparse(self.path)
 
-            if parsed_url.path == "/api/viz":
-                # Handle API request for jrun viz
-                self.handle_viz_request()
+            if parsed_url.path.startswith("/api/"):
+                self.handle_api_request(parsed_url.path)
             else:
-                # Handle main page
-                self.handle_main_page()
+                # Serve React app files
+                self.serve_react_app(parsed_url.path)
 
         except BrokenPipeError:
-            # Client disconnected, ignore
             pass
         except Exception as e:
-            # Log other errors but don't crash
             print(f"Error handling request: {e}")
+
+    def serve_react_app(self, path):
+        """Serve React app files with SPA routing support"""
+        # For SPA routing, serve index.html for non-file requests
+        if not path.startswith("/static/") and "." not in os.path.basename(path):
+            self.path = "/index.html"
+
+        # Use parent class to serve static files
+        super().do_GET()
+
+    def handle_api_request(self, path):
+        """Handle API requests"""
+        if path == "/api/viz":
+            self.handle_viz_request()
+        else:
+            self.send_error(404, "API endpoint not found")
 
     def handle_viz_request(self):
         """Handle jrun viz API request"""
         try:
-            # Run jrun viz --mode json
             result = subprocess.run(
                 ["jrun", "viz", "--mode", "json"],
                 capture_output=True,
@@ -62,151 +79,44 @@ class SimpleHTTPRequestHandler(http.server.BaseHTTPRequestHandler):
         except Exception as e:
             self.send_error(500, f"Internal error: {str(e)}")
 
-    def handle_main_page(self):
-        """Handle main page request"""
-        self.send_response(200)
-        self.send_header("Content-type", "text/html")
-        self.end_headers()
-
-        html_content = """
-<!DOCTYPE html>
-<html>
-<head>
-    <title>JRun Server</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            max-width: 800px;
-            margin: 0 auto;
-            padding: 20px;
-            background-color: #f5f5f5;
-        }
-        .container {
-            background: white;
-            padding: 30px;
-            border-radius: 10px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-        }
-        h1 {
-            color: #333;
-            text-align: center;
-        }
-        button {
-            background: #007bff;
-            color: white;
-            border: none;
-            padding: 12px 24px;
-            border-radius: 5px;
-            cursor: pointer;
-            font-size: 16px;
-            margin: 10px 0;
-        }
-        button:hover {
-            background: #0056b3;
-        }
-        button:disabled {
-            background: #ccc;
-            cursor: not-allowed;
-        }
-        #output {
-            margin-top: 20px;
-            padding: 15px;
-            background: #f8f9fa;
-            border: 1px solid #dee2e6;
-            border-radius: 5px;
-            white-space: pre-wrap;
-            font-family: monospace;
-            max-height: 400px;
-            overflow-y: auto;
-            display: none;
-        }
-        .loading {
-            color: #007bff;
-            font-style: italic;
-        }
-        .error {
-            color: #dc3545;
-            background: #f8d7da;
-            border-color: #f5c6cb;
-        }
-        .success {
-            color: #155724;
-            background: #d4edda;
-            border-color: #c3e6cb;
-        }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <h1>Hello World from JRun!</h1>
-        <p>Server is running successfully.</p>
-        
-        <button id="vizBtn" onclick="runJrunViz()">Run jrun viz --mode json</button>
-        
-        <div id="output"></div>
-    </div>
-
-    <script>
-        async function runJrunViz() {
-            const btn = document.getElementById('vizBtn');
-            const output = document.getElementById('output');
-            
-            // Disable button and show loading
-            btn.disabled = true;
-            btn.textContent = 'Running...';
-            output.style.display = 'block';
-            output.className = 'loading';
-            output.textContent = 'Executing jrun viz --mode json...';
-            
-            try {
-                const response = await fetch('/api/viz');
-                const data = await response.json();
-                
-                if (data.success) {
-                    output.className = 'success';
-                    output.textContent = data.stdout || 'Command executed successfully (no output)';
-                } else {
-                    output.className = 'error';
-                    output.textContent = `Error (code ${data.returncode}):\\n${data.stderr || data.stdout || 'Unknown error'}`;
-                }
-            } catch (error) {
-                output.className = 'error';
-                output.textContent = `Network error: ${error.message}`;
-            } finally {
-                // Re-enable button
-                btn.disabled = false;
-                btn.textContent = 'Run jrun viz --mode json';
-            }
-        }
-    </script>
-</body>
-</html>
-"""
-        self.wfile.write(html_content.encode("utf-8"))
-
     def log_message(self, format, *args):
         """Override to customize logging"""
-        print(f"[JRun Server] {format % args}")
+        print(f"[React Server] {format % args}")
 
 
-class JRunWebServer:
-    """Simple web server for jrun"""
+class ReactWebServer:
+    """Web server for Next.js static export with API"""
 
-    def __init__(self, port: int = 8080, host: str = "localhost"):
+    def __init__(
+        self, port: int = 3000, host: str = "localhost", build_dir: str = "out"
+    ):
         self.port = port
         self.host = host
+        self.build_dir = build_dir
         self.server: Optional[socketserver.TCPServer] = None
         self.server_thread: Optional[threading.Thread] = None
 
     def start(self, open_browser: bool = True, blocking: bool = True):
-        """Start the web server"""
+        """Start the React server"""
+        # Check if build directory exists
+        if not os.path.exists(self.build_dir):
+            print(f"❌ Export directory '{self.build_dir}' not found!")
+            print(f"💡 Run 'npm run build' in your Next.js app first")
+            print(f"💡 Make sure you have 'output: export' in next.config.js")
+            return
+
         try:
-            self.server = socketserver.TCPServer(
-                (self.host, self.port), SimpleHTTPRequestHandler
+            # Create custom handler with build directory
+            handler = lambda *args, **kwargs: ReactAppHandler(
+                *args, build_dir=self.build_dir, **kwargs
             )
 
+            self.server = socketserver.TCPServer((self.host, self.port), handler)
+
             url = f"http://{self.host}:{self.port}"
-            print(f"🌳 JRun server starting at {url}")
+            print(f"⚛️  Next.js server starting at {url}")
+            print(f"📁 Serving from: {os.path.abspath(self.build_dir)}")
+            print(f"🔌 API available at: {url}/api/viz")
             print(f"⏹️  Press Ctrl+C to stop")
 
             if open_browser:
@@ -239,16 +149,23 @@ class JRunWebServer:
         if self.server:
             self.server.shutdown()
             self.server.server_close()
-            print("✅ Server stopped")
+            print("✅ React server stopped")
 
 
-def serve_web_interface(
-    port: int = 8080,
+def serve_react_app(
+    port: int = 3000,
     host: str = "localhost",
+    build_dir: str = "out",
     open_browser: bool = True,
     blocking: bool = True,
 ):
-    """Start the JRun web server"""
-    server = JRunWebServer(port=port, host=host)
+    """Start the Next.js static export server"""
+    server = ReactWebServer(port=port, host=host, build_dir=build_dir)
     server.start(open_browser=open_browser, blocking=blocking)
     return server
+
+
+# Usage example:
+if __name__ == "__main__":
+    # Serve Next.js static export from 'out' directory
+    serve_react_app(port=3000, build_dir="out")

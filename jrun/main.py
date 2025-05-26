@@ -1,12 +1,10 @@
 import argparse
 from typing import Callable, Optional
-
 import appdirs
 from pathlib import Path
-
 from jrun.job_submitter import JobSubmitter
 from jrun.job_viewer import JobViewer
-from jrun.jweb_server import serve_web_interface
+from jrun.jweb_server import serve_react_app  # Updated import
 
 
 def get_default_db_path():
@@ -24,17 +22,9 @@ def ask_user_yes_no_question(
     """Delete the database file if it exists."""
     confirm = input(question).strip().lower()
     if confirm == "y":
-        # db_path = Path(db_path)
-        # # Cancel all jobs before deleting the database
-        # jr = JobSubmitter(db_path)
-        # jr.cancel_all()
-        # if db_path.exists():
-        #     db_path.unlink()
-        #     print(f"Deleted database at {db_path}")
         if on_yes:
             on_yes()
         else:
-            # print(f"No database found at {db_path}, nothing to delete.")
             if on_no:
                 on_no()
     else:
@@ -42,9 +32,7 @@ def ask_user_yes_no_question(
 
 
 def parse_args():
-
     default_db = get_default_db_path()
-
     parser = argparse.ArgumentParser(prog="jrun", description="Tiny Slurm helper")
     sub = parser.add_subparsers(dest="cmd", required=True)
 
@@ -134,14 +122,22 @@ def parse_args():
     )
 
     ###### jrun serve (start web interface)
-    p_serve = sub.add_parser("serve", help="Start web interface server")
+    p_serve = sub.add_parser("serve", help="Start Next.js web interface server")
     p_serve.add_argument(
-        "--port", type=int, default=3000, help="Port to serve on (default: 8080)"
+        "--port", type=int, default=3000, help="Port to serve on (default: 3000)"
     )
     p_serve.add_argument(
         "--host", default="localhost", help="Host to bind to (default: localhost)"
     )
     p_serve.add_argument("--db", default=default_db, help="SQLite DB path")
+    p_serve.add_argument(
+        "--build-dir",
+        default=None,
+        help="Build directory path (auto-detected if not specified)",
+    )
+    p_serve.add_argument(
+        "--no-browser", action="store_true", help="Don't open browser automatically"
+    )
 
     ###### jrun info
     p_info = sub.add_parser("info", help="Show jrun info")
@@ -155,15 +151,37 @@ def parse_args():
         "--db", default=default_db, help="SQLite DB path (default: jrun.db)"
     )
 
-    # ---------- Passthough for sbatch ----------
+    # ---------- Passthrough for sbatch ----------
     args, unknown = parser.parse_known_args()
-
     if args.cmd == "sbatch":
         args.sbatch_args = unknown  # forward everything
     elif unknown:
         parser.error(f"unrecognized arguments: {' '.join(unknown)}")
-
     return args
+
+
+def get_build_directory():
+    """Auto-detect the Next.js build directory"""
+    # Look for jweb directory relative to main.py
+    current_file = Path(__file__)
+    project_root = current_file.parent.parent  # Go up from jrun/jrun/ to jrun/
+
+    # Try different possible locations
+    possible_paths = [
+        project_root / "jweb" / "out",  # jrun/jweb/out
+        project_root / "jweb" / "build",  # jrun/jweb/build
+        Path("jweb/out"),  # Current directory
+        Path("jweb/build"),  # Current directory
+        Path("out"),  # Current directory
+        Path("build"),  # Current directory
+    ]
+
+    for path in possible_paths:
+        if path.exists() and path.is_dir():
+            return str(path.absolute())
+
+    # Default fallback
+    return str(project_root / "jweb" / "out")
 
 
 def main():
@@ -225,9 +243,22 @@ def main():
     # Start web server
     elif args.cmd == "serve":
         try:
-            serve_web_interface(
+            # Auto-detect build directory if not specified
+            build_dir = args.build_dir or get_build_directory()
+
+            print(f"🔍 Looking for Next.js build at: {build_dir}")
+
+            # Check if build directory exists
+            if not Path(build_dir).exists():
+                print(f"❌ Build directory not found: {build_dir}")
+                print(f"💡 Please build your Next.js app first:")
+                print(f"   cd jweb && npm run build")
+                exit(1)
+
+            serve_react_app(
                 port=args.port,
                 host=args.host,
+                build_dir=build_dir,
                 open_browser=False,
                 blocking=True,
             )
