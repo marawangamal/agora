@@ -197,6 +197,13 @@
             font-style: italic;
         }
 
+        .tooltip-progress {
+            font-size: 11px;
+            color: #6b7280;
+            margin-top: 4px;
+            text-align: center;
+        }
+
         /* Modal Styles */
         .modal {
             position: fixed;
@@ -758,7 +765,7 @@
                 case "completed": return "#10b981";
                 case "failed": return "#ef4444";
                 case "pending": return "#f59e0b";
-                case "mixed": return "#d97706"; // Changed to a warm orange/amber color
+                case "mixed": return "#d97706";
                 default: return "#6b7280";
             }
         }
@@ -789,6 +796,66 @@
         function formatTime(timeString) {
             if (!timeString) return "N/A";
             return new Date(timeString).toLocaleTimeString();
+        }
+
+        // Calculate group progress
+        function calculateGroupProgress(jobs) {
+            if (jobs.length === 0) return 0;
+            
+            let completedJobs = 0;
+            let runningJobs = 0;
+            
+            jobs.forEach(job => {
+                if (job.status === "COMPLETED") {
+                    completedJobs++;
+                } else if (job.status === "FAILED") {
+                    completedJobs++; // Count failed as "finished"
+                } else if (job.status === "RUNNING") {
+                    runningJobs++;
+                }
+                // PENDING jobs don't contribute to progress
+            });
+            
+            // Running jobs contribute 50% to progress
+            const totalProgress = completedJobs + (runningJobs * 0.5);
+            return Math.round((totalProgress / jobs.length) * 100);
+        }
+
+        // Get progress bar color based on group status
+        function getProgressColor(groupStatus, progress) {
+            if (progress === 100) {
+                return groupStatus === "FAILED" || groupStatus === "MIXED" ? "#ef4444" : "#10b981";
+            } else if (progress > 0) {
+                return "#3b82f6";
+            } else {
+                return "#f59e0b";
+            }
+        }
+
+        // Create progress gradient background
+        function createProgressBackground(progress, statusColor) {
+            if (progress === 0) {
+                return `rgba(${hexToRgb(statusColor)}, 0.1)`;
+            }
+            
+            const progressColor = getProgressColor("", progress);
+            const progressRgb = hexToRgb(progressColor);
+            const backgroundRgb = hexToRgb(statusColor);
+            
+            return `linear-gradient(to right, 
+                rgba(${progressRgb}, 0.3) 0%, 
+                rgba(${progressRgb}, 0.3) ${progress}%, 
+                rgba(${backgroundRgb}, 0.1) ${progress}%, 
+                rgba(${backgroundRgb}, 0.1) 100%)`;
+        }
+
+        // Helper function to convert hex to RGB
+        function hexToRgb(hex) {
+            const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+            if (result) {
+                return `${parseInt(result[1], 16)}, ${parseInt(result[2], 16)}, ${parseInt(result[3], 16)}`;
+            }
+            return "128, 128, 128"; // fallback gray
         }
 
         // Create node groups based on dependencies
@@ -828,11 +895,13 @@
             let groupIndex = 0;
 
             groupMap.forEach(groupJobs => {
+                const progress = calculateGroupProgress(groupJobs);
                 groups.push({
                     id: `group_${groupIndex++}`,
                     jobs: groupJobs,
                     parents: new Set(groupJobs[0].depends_on),
-                    children: parentToChildMap.get(groupJobs[0].job_id.toString()) || new Set()
+                    children: parentToChildMap.get(groupJobs[0].job_id.toString()) || new Set(),
+                    progress: progress
                 });
             });
 
@@ -896,6 +965,7 @@
             const breakdown = getStatusBreakdown(group.jobs);
             const jobIds = group.jobs.map(j => j.job_id);
             const displayText = smartRangeDisplay(jobIds);
+            const progress = calculateGroupProgress(group.jobs);
             
             tooltip.innerHTML = `
                 <div class="tooltip-header">Group #${displayText}</div>
@@ -903,6 +973,7 @@
                 <span class="tooltip-status ${getStatusClass(groupStatus)}">${groupStatus}</span>
                 ${groupStatus === "MIXED" ? `<div class="tooltip-breakdown">${breakdown}</div>` : ''}
                 <div class="tooltip-count">${group.jobs.length} job${group.jobs.length > 1 ? 's' : ''} total</div>
+                <div class="tooltip-progress">${progress}% complete</div>
             `;
             
             // Position tooltip
@@ -944,15 +1015,19 @@
                 const jobIds = group.jobs.map(j => j.job_id);
                 const displayText = smartRangeDisplay(jobIds);
                 const groupName = group.jobs[0].group_name || "root";
+                const statusColor = getStatusColor(groupStatus);
+                const progress = group.progress;
                 
                 elements.push({
                     data: {
                         id: group.id,
-                        label: `#${displayText}\n${groupName}\n${groupStatus}`,
+                        label: `#${displayText}\n${groupName}\n${groupStatus}\n${progress}%`,
                         status: groupStatus,
                         jobs: group.jobs,
                         displayText: displayText,
-                        groupName: groupName
+                        groupName: groupName,
+                        progress: progress,
+                        statusColor: statusColor
                     }
                 });
             });
@@ -987,24 +1062,28 @@
                             selector: 'node',
                             style: {
                                 'background-color': function(ele) {
-                                    return getStatusColor(ele.data('status'));
+                                    const progress = ele.data('progress');
+                                    const statusColor = ele.data('statusColor');
+                                    return createProgressBackground(progress, statusColor);
                                 },
-                                'background-opacity': 0.1,
                                 'border-color': function(ele) {
-                                    return getStatusColor(ele.data('status'));
+                                    return ele.data('statusColor');
                                 },
-                                'border-width': 2,
+                                'border-width': function(ele) {
+                                    const progress = ele.data('progress');
+                                    return progress > 0 ? 3 : 2;
+                                },
                                 'border-opacity': 0.8,
                                 'label': 'data(label)',
                                 'text-valign': 'center',
                                 'text-halign': 'center',
-                                'font-size': '12px',
+                                'font-size': '11px',
                                 'font-weight': 'bold',
                                 'color': '#111827',
                                 'text-wrap': 'wrap',
                                 'text-max-width': '140px',
                                 'width': '160px',
-                                'height': '80px',
+                                'height': '90px',
                                 'shape': 'round-rectangle',
                                 'cursor': 'pointer'
                             }
@@ -1012,9 +1091,8 @@
                         {
                             selector: 'node:hover',
                             style: {
-                                'border-width': 3,
-                                'border-opacity': 1,
-                                'background-opacity': 0.2
+                                'border-width': 4,
+                                'border-opacity': 1
                             }
                         },
                         {
