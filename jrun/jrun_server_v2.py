@@ -10,6 +10,7 @@ def create_app(default_db: str, web_folder: Path) -> Flask:
     app = Flask(__name__, static_folder=str(web_folder), static_url_path="")
 
     @app.route("/api/jobs")
+    @app.route("/api/jobs/")  # Handle both variations
     def api_jobs():
         db_path = request.args.get("db", default_db) or default_db
         viewer = JobViewer(db_path)

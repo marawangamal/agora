@@ -263,6 +263,7 @@ def main():
                 host=args.host,
                 port=args.port,
                 web_folder="web",  # relative to project root
+                # web_folder="jweb/out",  # relative to project root
             )
         except Exception as e:
             print(f"❌ Failed to start server: {e}")
