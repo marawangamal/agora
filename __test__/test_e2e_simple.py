@@ -33,8 +33,8 @@ class TestJrunSimple(unittest.TestCase):
                 [
                     "#!/bin/bash",
                     "#SBATCH --partition=debug",
-                    "#SBATCH --output=test-%j.out",
-                    "#SBATCH --error=test-%j.err",
+                    "#SBATCH --output=test.out",
+                    "#SBATCH --error=test.err",
                 ]
             ),
             "gpu": "\n".join(
@@ -684,6 +684,41 @@ class TestJrunSimple(unittest.TestCase):
                 " ".join(jobs[i].depends_on),
                 " ".join([str(j) for j in job_ids_list[:i]]),
             )
+
+    @patch("os.popen")
+    def test_sbatch_args(self, mock_popen):
+        """Test that sbatch args are passed correctly."""
+
+        ##### Setup mocks
+        mock_popen.side_effect = self.get_popen_mock_fn()
+        viewer = JobViewer(self.db_path)
+        submitter = JobSubmitter(self.db_path)
+        cfg = {
+            "group": {
+                "name": "test-group-sbatch",
+                "type": "sequential",
+                "jobs": [
+                    {
+                        "job": {
+                            "preamble": "base",
+                            "command": "echo 'First job'",
+                        },
+                    },
+                ],
+            },
+        }
+
+        submitter.walk(
+            node=submitter._parse_group_dict(cfg["group"]),
+            group_name=cfg["group"]["name"],
+            preamble_map=self.preamble_map,
+            depends_on=[],
+            submitted_jobs=[],
+        )
+
+        # Verify submission
+        jobs = viewer.get_jobs()
+        self.assertNotIn("#SBATCH --output=test.out", jobs[0].preamble_sbatch)
 
 
 if __name__ == "__main__":
