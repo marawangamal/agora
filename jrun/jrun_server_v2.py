@@ -1,10 +1,8 @@
 # jrun/serve.py
 
-import os
-import sqlite3
-import json
-from pathlib import Path
 from flask import Flask, jsonify, send_from_directory, request
+from pathlib import Path
+import sqlite3, json
 from jrun.job_viewer import JobViewer
 
 
@@ -13,79 +11,50 @@ def create_app(default_db: str, web_folder: Path) -> Flask:
 
     @app.route("/api/jobs")
     def api_jobs():
-        # only use override if non-empty
-        db_override = request.args.get("db", "").strip()
-        db_path = db_override or default_db
-
-        app.logger.debug(f"→ Opening DB: {db_path!r}")
+        db_path = request.args.get("db", default_db) or default_db
         viewer = JobViewer(db_path)
+        jobs = viewer.get_jobs(filters=None, ignore_status=False)
 
-        try:
-            jobs = viewer.get_jobs(filters=None)
-        except sqlite3.OperationalError as e:
-            # if the table doesn't exist yet, just return empty
-            if "no such table" in str(e).lower():
-                app.logger.warning(
-                    f"No jobs table in {db_path!r}, returning empty list"
-                )
-                return jsonify([])
-            raise
-
-        # serialize to plain dicts
-        out = [
+        # Build plain dicts
+        jobs_data = [
             {
-                "job_id": j.job_id,
-                "command": j.command,
-                "group_name": j.group_name,
-                "depends_on": j.depends_on,
-                "status": j.status,
+                "job_id": job.job_id,
+                "status": job.status,
+                "command": job.command,
+                "group_name": job.group_name,
+                "depends_on": job.depends_on,
+                "preamble": job.preamble,
             }
-            for j in jobs
+            for job in jobs
         ]
-        return jsonify(out)
+
+        # If they asked for JSON mode, wrap with stats/count
+        if request.args.get("format") == "json":
+            stats = viewer._get_status_totals(jobs)
+            return jsonify({"jobs": jobs_data, "stats": stats, "count": len(jobs_data)})
+
+        # Otherwise just return array
+        return jsonify(jobs_data)
 
     @app.route("/", defaults={"path": ""})
     @app.route("/<path:path>")
     def static_proxy(path):
-        target = web_folder / path
-        if path and target.exists():
+        full = web_folder / path
+        if path and full.exists():
             return send_from_directory(str(web_folder), path)
         return send_from_directory(str(web_folder), "index.html")
 
     return app
 
 
-def serve(
-    db: str,
-    host: str = "localhost",
-    port: int = 3000,
-    web_folder: str = "web",
-):
-    """
-    Launch the jrun Flask server:
-
-      db         – path to SQLite DB
-      host, port – interface to bind
-      web_folder – where index.html lives
-    """
-    # resolve absolute paths
-    here = Path(__file__).resolve().parent  # jrun/
-    project_root = here.parent  # project root
+def serve(db: str, host: str = "localhost", port: int = 3000, web_folder: str = "web"):
+    project_root = Path(__file__).resolve().parent.parent
     web_path = Path(web_folder)
     if not web_path.is_absolute():
-        web_path = project_root / web_path
-
-    # sanity check
+        web_path = project_root / web_folder
     if not (web_path / "index.html").exists():
-        raise FileNotFoundError(f"❌ Cannot find web/index.html at {web_path!r}")
-
-    print(
-        "🔌 jrun server configuration:\n"
-        f"    • DB path:    {db}\n"
-        f"    • Web folder: {web_path}\n"
-        f"    • Host:       {host}\n"
-        f"    • Port:       {port}\n"
-    )
+        raise FileNotFoundError(f"Cannot find web/index.html at {web_path!r}")
 
     app = create_app(default_db=db, web_folder=web_path)
+    print(f"🔌 Serving on http://{host}:{port}  (DB: {db})")
     app.run(host=host, port=port, debug=True)
