@@ -171,6 +171,7 @@ class JobSubmitter(JobDB):
         submitted_jobs: List[int] = [],
         submit_fn: Optional[Callable[[JobSpec], int]] = None,
         group_id: Optional[str] = None,
+        loop_id: Optional[str] = None,
     ):
         """Recursively walk the job tree and submit jobs."""
         submit_fn = submit_fn if submit_fn is not None else self._submit_jobspec
@@ -188,6 +189,7 @@ class JobSubmitter(JobDB):
                 command=node.command,
                 preamble=preamble_map.get(node.preamble, ""),
                 depends_on=[str(_id) for _id in depends_on],
+                loop_id=loop_id,
             )
             job.command = job.command.format(group_id=group_id)
             if debug:
@@ -217,6 +219,7 @@ class JobSubmitter(JobDB):
                     command=cmd,
                     preamble=preamble_map.get(node.preamble, ""),
                     depends_on=[str(_id) for _id in depends_on],
+                    loop_id=loop_id,
                 )
                 if debug:
                     print(f"\nDEBUG:\n{job.to_script(self.deptype)}\n")
@@ -273,6 +276,9 @@ class JobSubmitter(JobDB):
         elif node.type == "loop":
             # Sequential group
             sequential_job_ids = []
+            loop_id = (
+                f"{random.randint(100000, 999999)}" if loop_id is None else loop_id
+            )
             for t in range(node.loop_count):
                 for i, entry in enumerate(node.jobs):
                     group_name_i = ":".join(
@@ -289,6 +295,7 @@ class JobSubmitter(JobDB):
                         submit_fn=submit_fn,
                         group_id=copy.deepcopy(group_id),
                         group_name=group_name_i,
+                        loop_id=loop_id,
                     )
                     if job_ids:
                         depends_on.extend(job_ids)

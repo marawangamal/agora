@@ -185,6 +185,7 @@ group:
 ## Planned Features
 - [ ] Update afterany (allow some parent group failures)
 - [ ] View job logs in the web
+- [ ] Improve visual for loop group
 
 ## Requirements
 
