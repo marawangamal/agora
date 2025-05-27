@@ -10,9 +10,10 @@ export NVM_DIR="$HOME/.nvm"
 # Install Node LTS
 nvm install --lts
 nvm use --lts
-nvm alias default lts/*
+echo "Done.
+# nvm alias default lts/*
 
-echo "Done. Node/npm ready in this session."
-echo "For new terminals, run: source ~/.bashrc && source .venv/bin/activate"
+# echo "Done. Node/npm ready in this session."
+# echo "For new terminals, run: source ~/.bashrc && source .venv/bin/activate"
 
-nvm use --lts
+# nvm use --lts

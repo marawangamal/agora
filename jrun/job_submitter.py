@@ -270,6 +270,31 @@ class JobSubmitter(JobDB):
                     parallel_job_ids.extend(job_ids)
             return parallel_job_ids
 
+        elif node.type == "loop":
+            # Sequential group
+            sequential_job_ids = []
+            for t in range(node.loop_count):
+                for i, entry in enumerate(node.jobs):
+                    group_name_i = ":".join(
+                        [p for p in [copy.deepcopy(group_name), entry.name] if p]
+                    )
+                    job_ids = self.walk(
+                        entry,
+                        debug=debug,
+                        preamble_map=preamble_map,
+                        # depends_on=depends_on,
+                        # make a copy of depends_on
+                        depends_on=copy.deepcopy(depends_on),
+                        submitted_jobs=submitted_jobs,
+                        submit_fn=submit_fn,
+                        group_id=copy.deepcopy(group_id),
+                        group_name=group_name_i,
+                    )
+                    if job_ids:
+                        depends_on.extend(job_ids)
+                        sequential_job_ids.extend(job_ids)
+            return sequential_job_ids
+
         return submitted_jobs
 
     def sbatch(self, args: list):

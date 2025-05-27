@@ -525,6 +525,166 @@ class TestJrunSimple(unittest.TestCase):
             elif job.command.startswith("echo 'Third job'"):
                 self.assertEqual(job.group_name, "a:c")
 
+    # @patch("os.popen")
+    # def test_sequential_workflow(self, mock_popen):
+    #     """Test that jobs are submitted correctly."""
+
+    #     ##### Setup mocks
+    #     mock_popen.side_effect = self.get_popen_mock_fn()
+    #     viewer = JobViewer(self.db_path)
+    #     submitter = JobSubmitter(self.db_path)
+    #     root = {
+    #         "group": {
+    #             "name": "test-group-loop-root",
+    #             "type": "sequential",
+    #             "jobs": [
+    #                 {
+    #                     "group": {
+    #                         "type": "sequential",
+    #                         "jobs": [
+    #                             {
+    #                                 "job": {
+    #                                     "preamble": "gpu",
+    #                                     "command": "echo 'first loop' --group_id {group_id}",
+    #                                 }
+    #                             },
+    #                         ],
+    #                     }
+    #                 },
+    #                 {
+    #                     "group": {
+    #                         "type": "sequential",
+    #                         "jobs": [
+    #                             {
+    #                                 "job": {
+    #                                     "preamble": "gpu",
+    #                                     "command": "echo 'first loop' --group_id {group_id}",
+    #                                 }
+    #                             },
+    #                         ],
+    #                     }
+    #                 },
+    #             ],
+    #         },
+    #     }
+
+    #     submitter.walk(
+    #         node=submitter._parse_group_dict(root["group"]),
+    #         group_name=root["group"]["name"],
+    #         preamble_map=self.preamble_map,
+    #         depends_on=[],
+    #         submitted_jobs=[],
+    #     )
+
+    #     # Verify submission
+    #     jobs = viewer.get_jobs()
+    #     self.assertEqual(len(jobs), 4)
+    #     job_ids_list = [job.job_id for job in jobs]
+    #     for i in range(len(job_ids_list)):
+    #         self.assertEqual(
+    #             " ".join(jobs[i].depends_on),
+    #             " ".join([str(j) for j in job_ids_list[:i]]),
+    #         )
+
+    @patch("os.popen")
+    def test_nested_loop_workflow(self, mock_popen):
+        """Test that jobs are submitted correctly."""
+
+        ##### Setup mocks
+        mock_popen.side_effect = self.get_popen_mock_fn()
+        viewer = JobViewer(self.db_path)
+        submitter = JobSubmitter(self.db_path)
+        root = {
+            "group": {
+                "name": "test-group-loop",
+                "type": "loop",
+                "loop_count": 2,
+                "jobs": [
+                    {
+                        "job": {
+                            "preamble": "gpu",
+                            "command": "echo 'loop job' --group_id {group_id}",
+                        }
+                    },
+                ],
+            }
+        }
+
+        submitter.walk(
+            node=submitter._parse_group_dict(root["group"]),
+            group_name=root["group"]["name"],
+            preamble_map=self.preamble_map,
+            depends_on=[],
+            submitted_jobs=[],
+        )
+
+        # Verify submission
+        jobs = viewer.get_jobs()
+        self.assertEqual(len(jobs), 2)
+
+    @patch("os.popen")
+    def test_loop_workflow(self, mock_popen):
+        """Test that jobs are submitted correctly."""
+
+        ##### Setup mocks
+        mock_popen.side_effect = self.get_popen_mock_fn()
+        viewer = JobViewer(self.db_path)
+        submitter = JobSubmitter(self.db_path)
+        root = {
+            "group": {
+                "name": "test-group-loop-root",
+                "type": "sequential",
+                "jobs": [
+                    {
+                        "group": {
+                            "type": "loop",
+                            "loop_count": 2,
+                            "jobs": [
+                                {
+                                    "job": {
+                                        "preamble": "gpu",
+                                        "command": "echo 'first loop' --group_id {group_id}",
+                                    }
+                                },
+                            ],
+                        }
+                    },
+                    {
+                        "group": {
+                            "type": "loop",
+                            "loop_count": 2,
+                            "jobs": [
+                                {
+                                    "job": {
+                                        "preamble": "gpu",
+                                        "command": "echo 'second loop' --group_id {group_id}",
+                                    }
+                                },
+                            ],
+                        }
+                    },
+                ],
+            },
+        }
+
+        submitter.walk(
+            node=submitter._parse_group_dict(root["group"]),
+            group_name=root["group"]["name"],
+            preamble_map=self.preamble_map,
+            depends_on=[],
+            submitted_jobs=[],
+        )
+
+        # Verify submission
+        jobs = viewer.get_jobs()
+        self.assertEqual(len(jobs), 4)
+        job_ids_list = [job.job_id for job in jobs]
+        for i in range(len(job_ids_list)):
+            self.assertEqual(
+                " ".join(jobs[i].depends_on),
+                " ".join([str(j) for j in job_ids_list[:i]]),
+            )
+
 
 if __name__ == "__main__":
     unittest.main()

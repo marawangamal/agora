@@ -1,7 +1,9 @@
 from setuptools import setup, find_packages
 
 setup(
-    name="jrun",  # or whatever your project is called
+    # name="slurm-dag"
+    name="jrun",
+    description="Job management tool for running and monitoring jobs with dependencies",
     version="1.0.0",
     packages=find_packages(include=["jrun*"]),
     install_requires=[

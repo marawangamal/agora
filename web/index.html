@@ -1,0 +1,1339 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SLURM Dependency Graph</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background-color: #f9fafb;
+            color: #111827;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .header {
+            margin-bottom: 20px;
+        }
+
+        .header h1 {
+            font-size: 24px;
+            font-weight: bold;
+            margin-bottom: 8px;
+        }
+
+        .header p {
+            color: #6b7280;
+            font-size: 14px;
+        }
+
+        .graph-container {
+            position: relative;
+            width: 100%;
+            height: 600px;
+            background: white;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        .graph-controls {
+            position: absolute;
+            top: 16px;
+            right: 16px;
+            z-index: 10;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            background: white;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            padding: 8px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .graph-controls button {
+            padding: 4px 8px;
+            border: none;
+            border-radius: 4px;
+            background: #f3f4f6;
+            cursor: pointer;
+            font-size: 14px;
+            min-width: 40px;
+        }
+
+        .graph-controls button:hover {
+            background: #e5e7eb;
+        }
+
+        .reset-btn {
+            background: #dbeafe !important;
+            color: #1e40af !important;
+            font-size: 12px !important;
+        }
+
+        .refresh-btn {
+            background: #10b981 !important;
+            color: white !important;
+            font-size: 12px !important;
+        }
+
+        .loading-indicator {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            display: none;
+            z-index: 20;
+        }
+
+        .loading-indicator.show {
+            display: block;
+        }
+
+        .error-indicator {
+            position: absolute;
+            top: 16px;
+            left: 16px;
+            background: #fee2e2;
+            color: #dc2626;
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-size: 12px;
+            display: none;
+            z-index: 20;
+        }
+
+        .error-indicator.show {
+            display: block;
+        }
+
+        #cy {
+            width: 100%;
+            height: 100%;
+        }
+
+        .fallback-message {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            color: #6b7280;
+            display: none;
+        }
+
+        .fallback-message.show {
+            display: block;
+        }
+
+        /* Tooltip Styles */
+        .tooltip {
+            position: absolute;
+            background: white;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            padding: 12px;
+            box-shadow: 0 10px 15px rgba(0, 0, 0, 0.1);
+            font-size: 12px;
+            max-width: 250px;
+            z-index: 1000;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.2s ease;
+        }
+
+        .tooltip.show {
+            opacity: 1;
+        }
+
+        .tooltip-header {
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: #111827;
+            font-size: 14px;
+        }
+
+        .tooltip-group {
+            color: #6b7280;
+            margin-bottom: 8px;
+            font-style: italic;
+        }
+
+        .tooltip-status {
+            display: inline-block;
+            padding: 3px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 500;
+            margin-bottom: 8px;
+        }
+
+        .tooltip-breakdown {
+            font-size: 11px;
+            color: #6b7280;
+            margin-bottom: 4px;
+        }
+
+        .tooltip-count {
+            font-size: 11px;
+            color: #6b7280;
+            text-align: center;
+            font-style: italic;
+        }
+
+        /* Modal Styles */
+        .modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+
+        .modal.show {
+            display: flex;
+        }
+
+        .modal-content {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 20px 25px rgba(0, 0, 0, 0.15);
+            max-width: 800px;
+            max-height: 80vh;
+            width: 90%;
+            overflow: hidden;
+            animation: modalSlideIn 0.2s ease-out;
+        }
+
+        @keyframes modalSlideIn {
+            from {
+                opacity: 0;
+                transform: scale(0.95) translateY(-20px);
+            }
+            to {
+                opacity: 1;
+                transform: scale(1) translateY(0);
+            }
+        }
+
+        .modal-header {
+            padding: 24px 24px 16px 24px;
+            border-bottom: 1px solid #e5e7eb;
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+        }
+
+        .modal-title {
+            font-size: 20px;
+            font-weight: 600;
+            color: #111827;
+            margin-bottom: 4px;
+        }
+
+        .modal-subtitle {
+            font-size: 14px;
+            color: #6b7280;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .modal-stats {
+            display: flex;
+            gap: 16px;
+            margin-top: 8px;
+        }
+
+        .stat-item {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            font-size: 12px;
+            color: #6b7280;
+        }
+
+        .stat-value {
+            font-weight: 600;
+            color: #111827;
+        }
+
+        .close-btn {
+            background: none;
+            border: none;
+            font-size: 24px;
+            cursor: pointer;
+            color: #9ca3af;
+            padding: 4px;
+            border-radius: 4px;
+            line-height: 1;
+        }
+
+        .close-btn:hover {
+            color: #6b7280;
+            background: #f3f4f6;
+        }
+
+        .modal-body {
+            padding: 16px 24px 24px 24px;
+            overflow-y: auto;
+            max-height: 60vh;
+        }
+
+        .job-grid {
+            display: grid;
+            gap: 12px;
+        }
+
+        .job-card {
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            padding: 16px;
+            transition: all 0.2s;
+            background: #fafafa;
+        }
+
+        .job-card:hover {
+            background: #f3f4f6;
+            border-color: #d1d5db;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+        }
+
+        .job-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 12px;
+        }
+
+        .job-id {
+            font-family: monospace;
+            font-weight: 600;
+            font-size: 16px;
+            color: #111827;
+        }
+
+        .job-status {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 4px 8px;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+
+        .job-command {
+            font-family: monospace;
+            background: #f3f4f6;
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-size: 13px;
+            color: #374151;
+            margin-bottom: 12px;
+            border-left: 3px solid #e5e7eb;
+            word-break: break-all;
+        }
+
+        .job-details {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            font-size: 13px;
+        }
+
+        .job-detail-item {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+
+        .job-detail-label {
+            color: #6b7280;
+            font-weight: 500;
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .job-detail-value {
+            color: #111827;
+        }
+
+        .dependency-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px;
+        }
+
+        .dependency-tag {
+            background: #e0e7ff;
+            color: #3730a3;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-family: monospace;
+            font-weight: 500;
+        }
+
+        .resource-info {
+            background: #f0f9ff;
+            border: 1px solid #e0f2fe;
+            border-radius: 6px;
+            padding: 8px;
+            margin-top: 8px;
+        }
+
+        .resource-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 12px;
+            margin-bottom: 4px;
+        }
+
+        .resource-item:last-child {
+            margin-bottom: 0;
+        }
+
+        .resource-label {
+            color: #0369a1;
+            font-weight: 500;
+        }
+
+        .resource-value {
+            color: #0c4a6e;
+            font-family: monospace;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 6px;
+            background: #e5e7eb;
+            border-radius: 3px;
+            overflow: hidden;
+            margin-top: 4px;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #3b82f6, #1d4ed8);
+            transition: width 0.3s ease;
+        }
+
+        .status-running { background: #dbeafe; color: #1e40af; }
+        .status-completed { background: #d1fae5; color: #065f46; }
+        .status-failed { background: #fee2e2; color: #991b1b; }
+        .status-pending { background: #f3f4f6; color: #374151; }
+        .status-mixed { background: linear-gradient(135deg, #fbbf24, #f59e0b, #d97706); color: white; }
+
+        .status-icon {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            display: inline-block;
+        }
+
+        .icon-running { background: #3b82f6; }
+        .icon-completed { background: #10b981; }
+        .icon-failed { background: #ef4444; }
+        .icon-pending { background: #f59e0b; }
+        .icon-mixed { background: linear-gradient(135deg, #fbbf24, #f59e0b, #d97706); }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>SLURM Dependency Graph</h1>
+            <p>Professional dependency visualization. Click nodes for details, hover for quick info.</p>
+        </div>
+
+        <div class="graph-container">
+            <div class="loading-indicator" id="loading">
+                <div>Loading jobs...</div>
+            </div>
+            
+            <div class="error-indicator" id="error">
+                Failed to load jobs. Using dummy data.
+            </div>
+            
+            <div class="fallback-message" id="fallback">
+                <div>Loading graph library...</div>
+                <div style="margin-top: 8px; font-size: 12px;">If this persists, there may be a network issue.</div>
+            </div>
+            
+            <div class="graph-controls">
+                <button onclick="refreshJobs()" class="refresh-btn">↻</button>
+                <button onclick="fitGraph()">Fit</button>
+                <button onclick="zoomIn()">+</button>
+                <button onclick="zoomOut()">-</button>
+                <button class="reset-btn" onclick="resetView()">Reset</button>
+            </div>
+            
+            <div id="cy"></div>
+        </div>
+    </div>
+
+    <!-- Tooltip -->
+    <div id="tooltip" class="tooltip"></div>
+
+    <!-- Enhanced Modal -->
+    <div id="modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div>
+                    <div class="modal-title" id="modal-title">Group Details</div>
+                    <div class="modal-subtitle" id="modal-subtitle"></div>
+                    <div class="modal-stats" id="modal-stats"></div>
+                </div>
+                <button class="close-btn" onclick="closeModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="job-grid" id="job-grid"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Show fallback message initially
+        document.getElementById('fallback').classList.add('show');
+
+        // Dummy job data for development
+        const DUMMY_JOBS = [
+            {
+                job_id: 789012,
+                command: "jrun analyze --input dataset.csv --output results/",
+                group_name: "data_prep",
+                depends_on: [],
+                status: "COMPLETED",
+                preamble: "#!/bin/bash\n#SBATCH --job-name=analyze\n#SBATCH --time=01:00:00\n#SBATCH --mem=4G",
+                start_time: "2024-01-15 09:00:00",
+                end_time: "2024-01-15 09:45:00"
+            },
+            {
+                job_id: 123456,
+                command: "jrun viz --type scatter --input results/analysis.json",
+                group_name: "visualization",
+                depends_on: ["789012"],
+                status: "RUNNING",
+                preamble: "#!/bin/bash\n#SBATCH --job-name=viz-scatter\n#SBATCH --gres=gpu:1\n#SBATCH --time=02:00:00",
+                start_time: "2024-01-15 10:00:00",
+                stats: {
+                    gpu_memory_used_mb: 8192,
+                    gpu_memory_total_mb: 12288,
+                    gpu_count: 1,
+                    cpu_usage: 85
+                }
+            },
+            {
+                job_id: 123457,
+                command: "jrun viz --type histogram --input results/analysis.json",
+                group_name: "visualization",
+                depends_on: ["789012"],
+                status: "COMPLETED",
+                preamble: "#!/bin/bash\n#SBATCH --job-name=viz-histogram\n#SBATCH --gres=gpu:1",
+                start_time: "2024-01-15 10:00:00",
+                end_time: "2024-01-15 10:30:00"
+            },
+            {
+                job_id: 123458,
+                command: "jrun viz --type boxplot --input results/analysis.json",
+                group_name: "visualization",
+                depends_on: ["789012"],
+                status: "PENDING",
+                preamble: "#!/bin/bash\n#SBATCH --job-name=viz-boxplot\n#SBATCH --gres=gpu:1"
+            },
+            {
+                job_id: 345678,
+                command: "jrun preprocess --input data.csv --normalize --scale",
+                group_name: "preprocessing",
+                depends_on: ["789012"],
+                status: "COMPLETED",
+                preamble: "#!/bin/bash\n#SBATCH --job-name=preprocess\n#SBATCH --time=02:00:00\n#SBATCH --mem=8G",
+                start_time: "2024-01-15 09:50:00",
+                end_time: "2024-01-15 11:20:00"
+            },
+            {
+                job_id: 901234,
+                command: "jrun model_training --model linear --epochs 100",
+                group_name: "ml_pipeline",
+                depends_on: ["345678"],
+                status: "RUNNING",
+                preamble: "#!/bin/bash\n#SBATCH --job-name=train-linear\n#SBATCH --gres=gpu:2\n#SBATCH --time=04:00:00",
+                start_time: "2024-01-15 11:30:00",
+                stats: {
+                    gpu_memory_used_mb: 20480,
+                    gpu_memory_total_mb: 24576,
+                    gpu_count: 2,
+                    cpu_usage: 92
+                }
+            },
+            {
+                job_id: 901235,
+                command: "jrun model_training --model random_forest --trees 500",
+                group_name: "ml_pipeline",
+                depends_on: ["345678"],
+                status: "PENDING",
+                preamble: "#!/bin/bash\n#SBATCH --job-name=train-rf\n#SBATCH --time=04:00:00\n#SBATCH --mem=16G"
+            },
+            {
+                job_id: 901236,
+                command: "jrun model_training --model neural_net --layers 5",
+                group_name: "ml_pipeline",
+                depends_on: ["345678"],
+                status: "FAILED",
+                preamble: "#!/bin/bash\n#SBATCH --job-name=train-nn\n#SBATCH --gres=gpu:4",
+                start_time: "2024-01-15 11:30:00",
+                end_time: "2024-01-15 11:45:00",
+                error_message: "CUDA out of memory error"
+            },
+            {
+                job_id: 567890,
+                command: "jrun validation --cross-validate --folds 5",
+                group_name: "validation",
+                depends_on: ["123456", "123457", "345678"],
+                status: "PENDING",
+                preamble: "#!/bin/bash\n#SBATCH --job-name=validation-cv\n#SBATCH --time=01:30:00"
+            },
+            {
+                job_id: 567891,
+                command: "jrun validation --holdout --split 0.2",
+                group_name: "validation",
+                depends_on: ["123456", "123457", "345678"],
+                status: "PENDING",
+                preamble: "#!/bin/bash\n#SBATCH --job-name=validation-holdout\n#SBATCH --time=01:00:00"
+            },
+            {
+                job_id: 111222,
+                command: "jrun report --format pdf --template executive",
+                group_name: "reporting",
+                depends_on: ["567890", "567891"],
+                status: "PENDING",
+                preamble: "#!/bin/bash\n#SBATCH --job-name=report-pdf\n#SBATCH --time=00:30:00"
+            }
+        ];
+
+        // Global state
+        let jobs = [];
+        let cy = null;
+        let isLoading = false;
+        let librariesLoaded = false;
+        let tooltip = null;
+
+        // Function to load external libraries
+        function loadLibraries() {
+            return new Promise((resolve, reject) => {
+                // Load Cytoscape.js
+                const cytoscapeScript = document.createElement('script');
+                cytoscapeScript.src = 'https://cdnjs.cloudflare.com/ajax/libs/cytoscape/3.26.0/cytoscape.min.js';
+                cytoscapeScript.onload = () => {
+                    // Load Dagre layout extension
+                    const dagreScript = document.createElement('script');
+                    dagreScript.src = 'https://cdnjs.cloudflare.com/ajax/libs/dagre/0.8.5/dagre.min.js';
+                    dagreScript.onload = () => {
+                        // Load Cytoscape-Dagre extension
+                        const cytoscapeDagreScript = document.createElement('script');
+                        cytoscapeDagreScript.src = 'https://cdn.jsdelivr.net/npm/cytoscape-dagre@2.5.0/cytoscape-dagre.js';
+                        cytoscapeDagreScript.onload = () => {
+                            librariesLoaded = true;
+                            resolve();
+                        };
+                        cytoscapeDagreScript.onerror = reject;
+                        document.head.appendChild(cytoscapeDagreScript);
+                    };
+                    dagreScript.onerror = reject;
+                    document.head.appendChild(dagreScript);
+                };
+                cytoscapeScript.onerror = reject;
+                document.head.appendChild(cytoscapeScript);
+            });
+        }
+
+        // Function to fetch jobs from API or return dummy data
+        async function getJobs() {
+            try {
+                setLoading(true);
+                hideError();
+                
+                // Uncomment these lines to enable API calls:
+                const response = await fetch('/api/jobs');
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                const data = await response.json();
+                console.log('Fetched jobs from API:', data);
+                return data;
+
+                // For development, simulate API delay and return dummy data
+                await new Promise(resolve => setTimeout(resolve, 500));
+                console.log('Using dummy data for development');
+                return DUMMY_JOBS;
+                
+            } catch (error) {
+                console.error('Error fetching jobs from API:', error);
+                showError('Failed to load jobs from API. Using dummy data.');
+                
+                // Fallback to dummy data on error
+                return DUMMY_JOBS;
+            } finally {
+                setLoading(false);
+            }
+        }
+
+        // Loading and error state management
+        function setLoading(loading) {
+            isLoading = loading;
+            const loadingEl = document.getElementById('loading');
+            if (loading) {
+                loadingEl.classList.add('show');
+            } else {
+                loadingEl.classList.remove('show');
+            }
+        }
+
+        function showError(message) {
+            const errorEl = document.getElementById('error');
+            errorEl.textContent = message;
+            errorEl.classList.add('show');
+            
+            // Auto-hide error after 5 seconds
+            setTimeout(() => {
+                hideError();
+            }, 5000);
+        }
+
+        function hideError() {
+            document.getElementById('error').classList.remove('show');
+        }
+
+        function hideFallback() {
+            document.getElementById('fallback').classList.remove('show');
+        }
+
+        // Refresh jobs function
+        async function refreshJobs() {
+            if (isLoading) return;
+            
+            try {
+                const newJobs = await getJobs();
+                jobs = newJobs;
+                if (librariesLoaded) {
+                    renderGraph();
+                } else {
+                    renderSimpleGraph();
+                }
+                console.log('Jobs refreshed successfully');
+            } catch (error) {
+                console.error('Failed to refresh jobs:', error);
+                showError('Failed to refresh jobs');
+            }
+        }
+
+        // Utility functions
+        function getStatusColor(status) {
+            switch (status.toLowerCase()) {
+                case "running": return "#3b82f6";
+                case "completed": return "#10b981";
+                case "failed": return "#ef4444";
+                case "pending": return "#f59e0b";
+                case "mixed": return "#d97706"; // Changed to a warm orange/amber color
+                default: return "#6b7280";
+            }
+        }
+
+        function getStatusClass(status) {
+            return `status-${status.toLowerCase()}`;
+        }
+
+        function getStatusIcon(status) {
+            return `icon-${status.toLowerCase()}`;
+        }
+
+        function formatDuration(startTime, endTime) {
+            if (!startTime || !endTime) return "N/A";
+            const start = new Date(startTime);
+            const end = new Date(endTime);
+            const diffMs = end - start;
+            const diffMins = Math.floor(diffMs / 60000);
+            const diffHours = Math.floor(diffMins / 60);
+            const remainingMins = diffMins % 60;
+            
+            if (diffHours > 0) {
+                return `${diffHours}h ${remainingMins}m`;
+            }
+            return `${diffMins}m`;
+        }
+
+        function formatTime(timeString) {
+            if (!timeString) return "N/A";
+            return new Date(timeString).toLocaleTimeString();
+        }
+
+        // Create node groups based on dependencies
+        function createGroups() {
+            const parentToChildMap = new Map();
+            
+            // Build parent-child relationships
+            jobs.forEach(job => {
+                const jobId = job.job_id.toString();
+                job.depends_on.forEach(depId => {
+                    if (!parentToChildMap.has(depId)) {
+                        parentToChildMap.set(depId, new Set());
+                    }
+                    parentToChildMap.get(depId).add(jobId);
+                });
+            });
+
+            // Group jobs by dependency signature
+            const groupMap = new Map();
+            jobs.forEach(job => {
+                const jobId = job.job_id.toString();
+                const parents = new Set(job.depends_on);
+                const children = parentToChildMap.get(jobId) || new Set();
+
+                const parentsKey = Array.from(parents).sort().join(",");
+                const childrenKey = Array.from(children).sort().join(",");
+                const signature = `${parentsKey}|${childrenKey}`;
+
+                if (!groupMap.has(signature)) {
+                    groupMap.set(signature, []);
+                }
+                groupMap.get(signature).push(job);
+            });
+
+            // Convert to groups
+            const groups = [];
+            let groupIndex = 0;
+
+            groupMap.forEach(groupJobs => {
+                groups.push({
+                    id: `group_${groupIndex++}`,
+                    jobs: groupJobs,
+                    parents: new Set(groupJobs[0].depends_on),
+                    children: parentToChildMap.get(groupJobs[0].job_id.toString()) || new Set()
+                });
+            });
+
+            return groups;
+        }
+
+        // Smart range display for job IDs
+        function smartRangeDisplay(jobIds) {
+            const sorted = jobIds.sort((a, b) => a - b);
+            
+            if (sorted.length === 1) {
+                return sorted[0].toString();
+            } else if (sorted.length <= 3) {
+                return sorted.join(", ");
+            } else {
+                const isContinuous = sorted.every((id, i) => i === 0 || id === sorted[i - 1] + 1);
+                
+                if (isContinuous) {
+                    return `${sorted[0]}-${sorted[sorted.length - 1]}`;
+                } else {
+                    return `${sorted[0]}...${sorted[sorted.length - 1]}`;
+                }
+            }
+        }
+
+        // Get group status - returns MIXED if there are different statuses
+        function getGroupStatus(jobs) {
+            const statuses = [...new Set(jobs.map(job => job.status))];
+            if (statuses.length === 1) {
+                return statuses[0];
+            }
+            return "MIXED";
+        }
+
+        // Get status breakdown for tooltips and modals
+        function getStatusBreakdown(jobs) {
+            const counts = {
+                COMPLETED: 0,
+                RUNNING: 0,
+                FAILED: 0,
+                PENDING: 0
+            };
+            
+            jobs.forEach(job => {
+                counts[job.status] = (counts[job.status] || 0) + 1;
+            });
+            
+            const parts = [];
+            if (counts.COMPLETED > 0) parts.push(`${counts.COMPLETED} COMPLETED`);
+            if (counts.RUNNING > 0) parts.push(`${counts.RUNNING} RUNNING`);
+            if (counts.FAILED > 0) parts.push(`${counts.FAILED} FAILED`);
+            if (counts.PENDING > 0) parts.push(`${counts.PENDING} PENDING`);
+            
+            return parts.join(', ');
+        }
+
+        // Tooltip functions
+        function showTooltip(event, group) {
+            const tooltip = document.getElementById('tooltip');
+            const groupStatus = getGroupStatus(group.jobs);
+            const breakdown = getStatusBreakdown(group.jobs);
+            const jobIds = group.jobs.map(j => j.job_id);
+            const displayText = smartRangeDisplay(jobIds);
+            
+            tooltip.innerHTML = `
+                <div class="tooltip-header">Group #${displayText}</div>
+                <div class="tooltip-group">${group.jobs[0].group_name}</div>
+                <span class="tooltip-status ${getStatusClass(groupStatus)}">${groupStatus}</span>
+                ${groupStatus === "MIXED" ? `<div class="tooltip-breakdown">${breakdown}</div>` : ''}
+                <div class="tooltip-count">${group.jobs.length} job${group.jobs.length > 1 ? 's' : ''} total</div>
+            `;
+            
+            // Position tooltip
+            const rect = event.target.getBoundingClientRect();
+            const tooltipRect = tooltip.getBoundingClientRect();
+            
+            let left = event.clientX + 10;
+            let top = event.clientY - 10;
+            
+            // Adjust if tooltip would go off screen
+            if (left + 250 > window.innerWidth) {
+                left = event.clientX - 260;
+            }
+            if (top + tooltipRect.height > window.innerHeight) {
+                top = event.clientY - tooltipRect.height - 10;
+            }
+            
+            tooltip.style.left = left + 'px';
+            tooltip.style.top = top + 'px';
+            tooltip.classList.add('show');
+        }
+
+        function hideTooltip() {
+            document.getElementById('tooltip').classList.remove('show');
+        }
+
+        // Render the graph using Cytoscape.js (when libraries are loaded)
+        function renderGraph() {
+            if (jobs.length === 0 || !librariesLoaded) return;
+            
+            const groups = createGroups();
+            
+            // Prepare nodes and edges for Cytoscape
+            const elements = [];
+            
+            // Add nodes
+            groups.forEach(group => {
+                const groupStatus = getGroupStatus(group.jobs);
+                const jobIds = group.jobs.map(j => j.job_id);
+                const displayText = smartRangeDisplay(jobIds);
+                const groupName = group.jobs[0].group_name || "root";
+                
+                elements.push({
+                    data: {
+                        id: group.id,
+                        label: `#${displayText}\n${groupName}\n${groupStatus}`,
+                        status: groupStatus,
+                        jobs: group.jobs,
+                        displayText: displayText,
+                        groupName: groupName
+                    }
+                });
+            });
+            
+            // Add edges
+            groups.forEach(group => {
+                Array.from(group.parents).forEach(parentId => {
+                    const parentGroup = groups.find(g => g.jobs.some(j => j.job_id.toString() === parentId));
+                    if (parentGroup && parentGroup.id !== group.id) {
+                        elements.push({
+                            data: {
+                                id: `${parentGroup.id}-${group.id}`,
+                                source: parentGroup.id,
+                                target: group.id
+                            }
+                        });
+                    }
+                });
+            });
+
+            // Initialize or update Cytoscape
+            if (cy) {
+                cy.destroy();
+            }
+
+            try {
+                cy = cytoscape({
+                    container: document.getElementById('cy'),
+                    elements: elements,
+                    style: [
+                        {
+                            selector: 'node',
+                            style: {
+                                'background-color': function(ele) {
+                                    return getStatusColor(ele.data('status'));
+                                },
+                                'background-opacity': 0.1,
+                                'border-color': function(ele) {
+                                    return getStatusColor(ele.data('status'));
+                                },
+                                'border-width': 2,
+                                'border-opacity': 0.8,
+                                'label': 'data(label)',
+                                'text-valign': 'center',
+                                'text-halign': 'center',
+                                'font-size': '12px',
+                                'font-weight': 'bold',
+                                'color': '#111827',
+                                'text-wrap': 'wrap',
+                                'text-max-width': '140px',
+                                'width': '160px',
+                                'height': '80px',
+                                'shape': 'round-rectangle',
+                                'cursor': 'pointer'
+                            }
+                        },
+                        {
+                            selector: 'node:hover',
+                            style: {
+                                'border-width': 3,
+                                'border-opacity': 1,
+                                'background-opacity': 0.2
+                            }
+                        },
+                        {
+                            selector: 'edge',
+                            style: {
+                                'width': 2,
+                                'line-color': '#6b7280',
+                                'target-arrow-color': '#6b7280',
+                                'target-arrow-shape': 'triangle',
+                                'curve-style': 'bezier',
+                                'control-point-step-size': 40,
+                                'arrow-scale': 1.2
+                            }
+                        },
+                        {
+                            selector: 'edge:hover',
+                            style: {
+                                'width': 3,
+                                'line-color': '#374151',
+                                'target-arrow-color': '#374151'
+                            }
+                        }
+                    ],
+                    layout: {
+                        name: 'dagre',
+                        rankDir: 'LR',
+                        spacingFactor: 1.5,
+                        nodeSep: 50,
+                        rankSep: 100,
+                        edgeSep: 10
+                    },
+                    userZoomingEnabled: true,
+                    userPanningEnabled: true,
+                    boxSelectionEnabled: false,
+                    selectionType: 'single',
+                    wheelSensitivity: 0.2
+                });
+
+                // Add event listeners
+                cy.on('tap', 'node', function(evt) {
+                    const node = evt.target;
+                    const group = {
+                        jobs: node.data('jobs'),
+                        displayText: node.data('displayText'),
+                        groupName: node.data('groupName')
+                    };
+                    showGroupDetails(group);
+                });
+
+                // Add hover event listeners for tooltips
+                cy.on('mouseover', 'node', function(evt) {
+                    const node = evt.target;
+                    const group = {
+                        jobs: node.data('jobs'),
+                        displayText: node.data('displayText'),
+                        groupName: node.data('groupName')
+                    };
+                    showTooltip(evt.originalEvent, group);
+                });
+
+                cy.on('mouseout', 'node', function(evt) {
+                    hideTooltip();
+                });
+
+                // Hide tooltip when mouse moves over the graph container
+                cy.on('mousemove', function(evt) {
+                    if (evt.target === cy) {
+                        hideTooltip();
+                    }
+                });
+
+                // Fit the graph to the container
+                cy.fit();
+                
+                hideFallback();
+            } catch (error) {
+                console.error('Error initializing Cytoscape:', error);
+                renderSimpleGraph();
+            }
+        }
+
+        // Fallback: Simple SVG graph (if Cytoscape fails to load)
+        function renderSimpleGraph() {
+            hideFallback();
+            const cyContainer = document.getElementById('cy');
+            cyContainer.innerHTML = `
+                <div style="display: flex; align-items: center; justify-content: center; height: 100%; flex-direction: column; color: #6b7280;">
+                    <div style="font-size: 18px; margin-bottom: 8px;">📊 Simple Graph View</div>
+                    <div style="font-size: 14px; margin-bottom: 16px;">External libraries couldn't load, showing basic view</div>
+                    <div style="display: grid; gap: 12px; max-width: 600px;">
+                        ${jobs.map(job => `
+                            <div style="border: 1px solid #e5e7eb; border-radius: 8px; padding: 12px; background: white;">
+                                <div style="font-weight: bold; margin-bottom: 4px;">#${job.job_id} - ${job.status}</div>
+                                <div style="font-size: 12px; color: #6b7280;">${job.group_name}</div>
+                                <div style="font-size: 11px; color: #9ca3af; margin-top: 4px;">${job.command}</div>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            `;
+        }
+
+        // Graph control functions
+        function fitGraph() {
+            if (cy) {
+                cy.fit();
+            }
+        }
+
+        function zoomIn() {
+            if (cy) {
+                cy.zoom(cy.zoom() * 1.2);
+            }
+        }
+
+        function zoomOut() {
+            if (cy) {
+                cy.zoom(cy.zoom() * 0.8);
+            }
+        }
+
+        function resetView() {
+            if (cy) {
+                cy.fit();
+                cy.center();
+            }
+        }
+
+        // Enhanced modal for group details
+        function showGroupDetails(group) {
+            const groupStatus = getGroupStatus(group.jobs);
+            
+            // Update modal header
+            document.getElementById('modal-title').textContent = `Group: ${group.displayText}`;
+            
+            const completedJobs = group.jobs.filter(j => j.status === "COMPLETED").length;
+            const runningJobs = group.jobs.filter(j => j.status === "RUNNING").length;
+            const failedJobs = group.jobs.filter(j => j.status === "FAILED").length;
+            const pendingJobs = group.jobs.filter(j => j.status === "PENDING").length;
+            
+            document.getElementById('modal-subtitle').innerHTML = `
+                <span>${group.groupName}</span>
+                <span>•</span>
+                <span>${group.jobs.length} jobs</span>
+                <span>•</span>
+                <span class="status-${groupStatus.toLowerCase()}">${groupStatus}</span>
+            `;
+            
+            document.getElementById('modal-stats').innerHTML = `
+                <div class="stat-item">
+                    <span class="stat-value">${completedJobs}</span>
+                    <span>completed</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-value">${runningJobs}</span>
+                    <span>running</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-value">${failedJobs}</span>
+                    <span>failed</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-value">${pendingJobs}</span>
+                    <span>pending</span>
+                </div>
+            `;
+            
+            // Update modal body
+            const jobGrid = document.getElementById('job-grid');
+            jobGrid.innerHTML = '';
+            
+            group.jobs.forEach(job => {
+                const jobCard = document.createElement('div');
+                jobCard.className = 'job-card';
+                
+                let resourceInfo = '';
+                if (job.status === "RUNNING" && job.stats) {
+                    const gpuUsage = (job.stats.gpu_memory_used_mb / job.stats.gpu_memory_total_mb) * 100;
+                    resourceInfo = `
+                        <div class="resource-info">
+                            <div class="resource-item">
+                                <span class="resource-label">GPU Memory</span>
+                                <span class="resource-value">${job.stats.gpu_memory_used_mb}MB / ${job.stats.gpu_memory_total_mb}MB</span>
+                            </div>
+                            <div class="progress-bar">
+                                <div class="progress-fill" style="width: ${gpuUsage}%"></div>
+                            </div>
+                            <div class="resource-item">
+                                <span class="resource-label">GPU Count</span>
+                                <span class="resource-value">${job.stats.gpu_count}</span>
+                            </div>
+                            <div class="resource-item">
+                                <span class="resource-label">CPU Usage</span>
+                                <span class="resource-value">${job.stats.cpu_usage}%</span>
+                            </div>
+                        </div>
+                    `;
+                }
+                
+                let errorInfo = '';
+                if (job.status === "FAILED" && job.error_message) {
+                    errorInfo = `
+                        <div class="resource-info" style="background: #fef2f2; border-color: #fecaca;">
+                            <div class="resource-item">
+                                <span class="resource-label" style="color: #dc2626;">Error</span>
+                                <span class="resource-value" style="color: #dc2626;">${job.error_message}</span>
+                            </div>
+                        </div>
+                    `;
+                }
+                
+                jobCard.innerHTML = `
+                    <div class="job-header">
+                        <div class="job-id">#${job.job_id}</div>
+                        <div class="job-status ${getStatusClass(job.status)}">
+                            <span class="status-icon ${getStatusIcon(job.status)}"></span>
+                            ${job.status}
+                        </div>
+                    </div>
+                    
+                    <div class="job-command">${job.command}</div>
+                    
+                    <div class="job-details">
+                        <div class="job-detail-item">
+                            <div class="job-detail-label">Dependencies</div>
+                            <div class="job-detail-value">
+                                ${job.depends_on.length > 0 ? 
+                                    `<div class="dependency-list">
+                                        ${job.depends_on.map(dep => `<span class="dependency-tag">#${dep}</span>`).join('')}
+                                    </div>` :
+                                    'None'
+                                }
+                            </div>
+                        </div>
+                        
+                        <div class="job-detail-item">
+                            <div class="job-detail-label">Duration</div>
+                            <div class="job-detail-value">${formatDuration(job.start_time, job.end_time)}</div>
+                        </div>
+                        
+                        <div class="job-detail-item">
+                            <div class="job-detail-label">Start Time</div>
+                            <div class="job-detail-value">${formatTime(job.start_time)}</div>
+                        </div>
+                        
+                        <div class="job-detail-item">
+                            <div class="job-detail-label">End Time</div>
+                            <div class="job-detail-value">${formatTime(job.end_time)}</div>
+                        </div>
+                    </div>
+                    
+                    ${resourceInfo}
+                    ${errorInfo}
+                `;
+                
+                jobGrid.appendChild(jobCard);
+            });
+            
+            // Show modal
+            document.getElementById('modal').classList.add('show');
+        }
+
+        function closeModal() {
+            document.getElementById('modal').classList.remove('show');
+        }
+
+        // Close modal when clicking outside
+        document.getElementById('modal').addEventListener('click', (e) => {
+            if (e.target.id === 'modal') {
+                closeModal();
+            }
+        });
+
+        // Hide tooltip when clicking anywhere
+        document.addEventListener('click', () => {
+            hideTooltip();
+        });
+
+        // Initialize the application
+        async function init() {
+            try {
+                // Try to load external libraries
+                try {
+                    await loadLibraries();
+                    console.log('External libraries loaded successfully');
+                } catch (error) {
+                    console.warn('Failed to load external libraries, using fallback:', error);
+                    librariesLoaded = false;
+                }
+
+                // Load job data
+                jobs = await getJobs();
+                
+                // Render graph
+                if (librariesLoaded) {
+                    renderGraph();
+                } else {
+                    renderSimpleGraph();
+                }
+                
+                console.log('Application initialized successfully');
+                
+            } catch (error) {
+                console.error('Failed to initialize:', error);
+                showError('Failed to initialize application');
+                hideFallback();
+                
+                // Show basic fallback
+                const cyContainer = document.getElementById('cy');
+                cyContainer.innerHTML = `
+                    <div style="display: flex; align-items: center; justify-content: center; height: 100%; color: #dc2626;">
+                        <div>Failed to initialize application. Please refresh the page.</div>
+                    </div>
+                `;
+            }
+        }
+
+        // Start the application
+        init();
+    </script>
+</body>
+</html>
