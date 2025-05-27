@@ -1,6 +1,6 @@
 "use client"
 
-import type React from "react"
+import type React from "./$node_modules/@types/react/index.js"
 
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -22,8 +22,8 @@ import {
   HardDrive,
   Moon,
   Sun,
-} from "lucide-react"
-import { useMemo, useState, useRef, useEffect } from "react"
+} from "./$node_modules/lucide-react/dist/lucide-react.js"
+import { useMemo, useState, useRef, useEffect } from "./$node_modules/@types/react/index.js"
 import { Progress } from "@/components/ui/progress"
 
 interface JobStats {
