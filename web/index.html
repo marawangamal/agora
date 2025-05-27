@@ -142,16 +142,16 @@
             display: block;
         }
 
-        /* Tooltip Styles */
+        /* Simplified Tooltip Styles */
         .tooltip {
             position: absolute;
             background: white;
             border: 1px solid #e5e7eb;
-            border-radius: 8px;
-            padding: 12px;
-            box-shadow: 0 10px 15px rgba(0, 0, 0, 0.1);
+            border-radius: 6px;
+            padding: 8px 12px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
             font-size: 12px;
-            max-width: 250px;
+            max-width: 200px;
             z-index: 1000;
             pointer-events: none;
             opacity: 0;
@@ -164,44 +164,15 @@
 
         .tooltip-header {
             font-weight: 600;
-            margin-bottom: 8px;
+            margin-bottom: 6px;
             color: #111827;
-            font-size: 14px;
-        }
-
-        .tooltip-group {
-            color: #6b7280;
-            margin-bottom: 8px;
-            font-style: italic;
-        }
-
-        .tooltip-status {
-            display: inline-block;
-            padding: 3px 8px;
-            border-radius: 4px;
-            font-size: 11px;
-            font-weight: 500;
-            margin-bottom: 8px;
+            font-size: 13px;
         }
 
         .tooltip-breakdown {
             font-size: 11px;
             color: #6b7280;
-            margin-bottom: 4px;
-        }
-
-        .tooltip-count {
-            font-size: 11px;
-            color: #6b7280;
-            text-align: center;
-            font-style: italic;
-        }
-
-        .tooltip-progress {
-            font-size: 11px;
-            color: #6b7280;
-            margin-top: 4px;
-            text-align: center;
+            line-height: 1.4;
         }
 
         /* Modal Styles */
@@ -503,7 +474,7 @@
         </div>
     </div>
 
-    <!-- Tooltip -->
+    <!-- Simplified Tooltip -->
     <div id="tooltip" class="tooltip"></div>
 
     <!-- Enhanced Modal -->
@@ -685,13 +656,13 @@
                 hideError();
                 
                 // Uncomment these lines to enable API calls:
-                const response = await fetch('/api/jobs');
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
-                }
-                const data = await response.json();
-                console.log('Fetched jobs from API:', data);
-                return data;
+                // const response = await fetch('/api/jobs');
+                // if (!response.ok) {
+                //     throw new Error(`HTTP error! status: ${response.status}`);
+                // }
+                // const data = await response.json();
+                // console.log('Fetched jobs from API:', data);
+                // return data;
 
                 // For development, simulate API delay and return dummy data
                 await new Promise(resolve => setTimeout(resolve, 500));
@@ -798,64 +769,38 @@
             return new Date(timeString).toLocaleTimeString();
         }
 
-        // Calculate group progress
-        function calculateGroupProgress(jobs) {
+        // Updated color logic based on new rules
+        function getNodeColor(jobs) {
+            const statuses = jobs.map(job => job.status);
+            
+            // Rule 3: Use active color (blue) if at least one job is running
+            if (statuses.includes("RUNNING")) {
+                return "RUNNING";
+            }
+            
+            // Rule 1: Use failed color (red) only if ALL jobs have failed
+            if (statuses.every(status => status === "FAILED")) {
+                return "FAILED";
+            }
+            
+            // Rule 2: Use pending color (orange) only if ALL jobs are pending
+            if (statuses.every(status => status === "PENDING")) {
+                return "PENDING";
+            }
+            
+            // Rule 4: Otherwise use completed color (green)
+            return "COMPLETED";
+        }
+
+        // Calculate progress: (completed + failed) / total
+        function calculateProgress(jobs) {
             if (jobs.length === 0) return 0;
             
-            let completedJobs = 0;
-            let runningJobs = 0;
+            const finishedJobs = jobs.filter(job => 
+                job.status === "COMPLETED" || job.status === "FAILED"
+            ).length;
             
-            jobs.forEach(job => {
-                if (job.status === "COMPLETED") {
-                    completedJobs++;
-                } else if (job.status === "FAILED") {
-                    completedJobs++; // Count failed as "finished"
-                } else if (job.status === "RUNNING") {
-                    runningJobs++;
-                }
-                // PENDING jobs don't contribute to progress
-            });
-            
-            // Running jobs contribute 50% to progress
-            const totalProgress = completedJobs + (runningJobs * 0.5);
-            return Math.round((totalProgress / jobs.length) * 100);
-        }
-
-        // Get progress bar color based on group status
-        function getProgressColor(groupStatus, progress) {
-            if (progress === 100) {
-                return groupStatus === "FAILED" || groupStatus === "MIXED" ? "#ef4444" : "#10b981";
-            } else if (progress > 0) {
-                return "#3b82f6";
-            } else {
-                return "#f59e0b";
-            }
-        }
-
-        // Create progress gradient background
-        function createProgressBackground(progress, statusColor) {
-            if (progress === 0) {
-                return `rgba(${hexToRgb(statusColor)}, 0.1)`;
-            }
-            
-            const progressColor = getProgressColor("", progress);
-            const progressRgb = hexToRgb(progressColor);
-            const backgroundRgb = hexToRgb(statusColor);
-            
-            return `linear-gradient(to right, 
-                rgba(${progressRgb}, 0.3) 0%, 
-                rgba(${progressRgb}, 0.3) ${progress}%, 
-                rgba(${backgroundRgb}, 0.1) ${progress}%, 
-                rgba(${backgroundRgb}, 0.1) 100%)`;
-        }
-
-        // Helper function to convert hex to RGB
-        function hexToRgb(hex) {
-            const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-            if (result) {
-                return `${parseInt(result[1], 16)}, ${parseInt(result[2], 16)}, ${parseInt(result[3], 16)}`;
-            }
-            return "128, 128, 128"; // fallback gray
+            return Math.round((finishedJobs / jobs.length) * 100);
         }
 
         // Create node groups based on dependencies
@@ -895,13 +840,16 @@
             let groupIndex = 0;
 
             groupMap.forEach(groupJobs => {
-                const progress = calculateGroupProgress(groupJobs);
+                const progress = calculateProgress(groupJobs);
+                const nodeColor = getNodeColor(groupJobs);
+                
                 groups.push({
                     id: `group_${groupIndex++}`,
                     jobs: groupJobs,
                     parents: new Set(groupJobs[0].depends_on),
                     children: parentToChildMap.get(groupJobs[0].job_id.toString()) || new Set(),
-                    progress: progress
+                    progress: progress,
+                    nodeColor: nodeColor
                 });
             });
 
@@ -936,7 +884,7 @@
             return "MIXED";
         }
 
-        // Get status breakdown for tooltips and modals
+        // Get status breakdown for simplified tooltips
         function getStatusBreakdown(jobs) {
             const counts = {
                 COMPLETED: 0,
@@ -950,45 +898,36 @@
             });
             
             const parts = [];
-            if (counts.COMPLETED > 0) parts.push(`${counts.COMPLETED} COMPLETED`);
-            if (counts.RUNNING > 0) parts.push(`${counts.RUNNING} RUNNING`);
-            if (counts.FAILED > 0) parts.push(`${counts.FAILED} FAILED`);
-            if (counts.PENDING > 0) parts.push(`${counts.PENDING} PENDING`);
+            if (counts.COMPLETED > 0) parts.push(`${counts.COMPLETED} completed`);
+            if (counts.RUNNING > 0) parts.push(`${counts.RUNNING} running`);
+            if (counts.FAILED > 0) parts.push(`${counts.FAILED} failed`);
+            if (counts.PENDING > 0) parts.push(`${counts.PENDING} pending`);
             
-            return parts.join(', ');
+            return parts.join(' • ');
         }
 
-        // Tooltip functions
+        // Simplified tooltip function
         function showTooltip(event, group) {
             const tooltip = document.getElementById('tooltip');
-            const groupStatus = getGroupStatus(group.jobs);
-            const breakdown = getStatusBreakdown(group.jobs);
             const jobIds = group.jobs.map(j => j.job_id);
             const displayText = smartRangeDisplay(jobIds);
-            const progress = calculateGroupProgress(group.jobs);
+            const breakdown = getStatusBreakdown(group.jobs);
             
             tooltip.innerHTML = `
                 <div class="tooltip-header">Group #${displayText}</div>
-                <div class="tooltip-group">${group.jobs[0].group_name}</div>
-                <span class="tooltip-status ${getStatusClass(groupStatus)}">${groupStatus}</span>
-                ${groupStatus === "MIXED" ? `<div class="tooltip-breakdown">${breakdown}</div>` : ''}
-                <div class="tooltip-count">${group.jobs.length} job${group.jobs.length > 1 ? 's' : ''} total</div>
-                <div class="tooltip-progress">${progress}% complete</div>
+                <div class="tooltip-breakdown">${breakdown}</div>
             `;
             
             // Position tooltip
-            const rect = event.target.getBoundingClientRect();
-            const tooltipRect = tooltip.getBoundingClientRect();
-            
             let left = event.clientX + 10;
             let top = event.clientY - 10;
             
             // Adjust if tooltip would go off screen
-            if (left + 250 > window.innerWidth) {
-                left = event.clientX - 260;
+            if (left + 200 > window.innerWidth) {
+                left = event.clientX - 210;
             }
-            if (top + tooltipRect.height > window.innerHeight) {
-                top = event.clientY - tooltipRect.height - 10;
+            if (top + 60 > window.innerHeight) {
+                top = event.clientY - 70;
             }
             
             tooltip.style.left = left + 'px';
@@ -1011,23 +950,30 @@
             
             // Add nodes
             groups.forEach(group => {
-                const groupStatus = getGroupStatus(group.jobs);
                 const jobIds = group.jobs.map(j => j.job_id);
                 const displayText = smartRangeDisplay(jobIds);
                 const groupName = group.jobs[0].group_name || "root";
-                const statusColor = getStatusColor(groupStatus);
                 const progress = group.progress;
+                const nodeColor = group.nodeColor;
+                
+                // Get color based on new rules
+                const backgroundColor = getStatusColor(nodeColor);
+                const borderColor = getStatusColor(nodeColor);
+                
+                // Simple label like the original
+                const label = `#${displayText}\n${groupName}\n${progress}% done`;
                 
                 elements.push({
                     data: {
                         id: group.id,
-                        label: `#${displayText}\n${groupName}\n${groupStatus}\n${progress}%`,
-                        status: groupStatus,
+                        label: label,
                         jobs: group.jobs,
                         displayText: displayText,
                         groupName: groupName,
                         progress: progress,
-                        statusColor: statusColor
+                        nodeColor: nodeColor,
+                        backgroundColor: backgroundColor,
+                        borderColor: borderColor
                     }
                 });
             });
@@ -1062,28 +1008,24 @@
                             selector: 'node',
                             style: {
                                 'background-color': function(ele) {
-                                    const progress = ele.data('progress');
-                                    const statusColor = ele.data('statusColor');
-                                    return createProgressBackground(progress, statusColor);
+                                    return ele.data('backgroundColor');
                                 },
+                                'background-opacity': 0.15,
                                 'border-color': function(ele) {
-                                    return ele.data('statusColor');
+                                    return ele.data('borderColor');
                                 },
-                                'border-width': function(ele) {
-                                    const progress = ele.data('progress');
-                                    return progress > 0 ? 3 : 2;
-                                },
+                                'border-width': 2,
                                 'border-opacity': 0.8,
                                 'label': 'data(label)',
                                 'text-valign': 'center',
                                 'text-halign': 'center',
-                                'font-size': '11px',
+                                'font-size': '12px',
                                 'font-weight': 'bold',
                                 'color': '#111827',
                                 'text-wrap': 'wrap',
                                 'text-max-width': '140px',
                                 'width': '160px',
-                                'height': '90px',
+                                'height': '60px',
                                 'shape': 'round-rectangle',
                                 'cursor': 'pointer'
                             }
@@ -1091,8 +1033,9 @@
                         {
                             selector: 'node:hover',
                             style: {
-                                'border-width': 4,
-                                'border-opacity': 1
+                                'border-width': 3,
+                                'border-opacity': 1,
+                                'background-opacity': 0.25
                             }
                         },
                         {
@@ -1142,7 +1085,7 @@
                     showGroupDetails(group);
                 });
 
-                // Add hover event listeners for tooltips
+                // Add hover event listeners for simplified tooltips
                 cy.on('mouseover', 'node', function(evt) {
                     const node = evt.target;
                     const group = {
