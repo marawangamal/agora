@@ -5,6 +5,91 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SLURM Dependency Graph</title>
     <style>
+        :root {
+            /* Light theme colors */
+            --bg-primary: #f9fafb;
+            --bg-secondary: #ffffff;
+            --bg-tertiary: #fafafa;
+            --bg-quaternary: #f3f4f6;
+            --text-primary: #111827;
+            --text-secondary: #6b7280;
+            --text-tertiary: #9ca3af;
+            --border-primary: #e5e7eb;
+            --border-secondary: #d1d5db;
+            --shadow-primary: rgba(0, 0, 0, 0.1);
+            --shadow-secondary: rgba(0, 0, 0, 0.05);
+            --overlay: rgba(0, 0, 0, 0.5);
+            
+            /* Status colors (same for both themes) */
+            --status-running: #3b82f6;
+            --status-completed: #10b981;
+            --status-failed: #ef4444;
+            --status-pending: #f59e0b;
+            --status-mixed: #d97706;
+            
+            /* Status backgrounds */
+            --status-running-bg: #dbeafe;
+            --status-completed-bg: #d1fae5;
+            --status-failed-bg: #fee2e2;
+            --status-pending-bg: #f3f4f6;
+            
+            /* Status text */
+            --status-running-text: #1e40af;
+            --status-completed-text: #065f46;
+            --status-failed-text: #991b1b;
+            --status-pending-text: #374151;
+            
+            /* Resource info */
+            --resource-bg: #f0f9ff;
+            --resource-border: #e0f2fe;
+            --resource-label: #0369a1;
+            --resource-value: #0c4a6e;
+            
+            /* Error info */
+            --error-bg: #fef2f2;
+            --error-border: #fecaca;
+            --error-text: #dc2626;
+        }
+
+        [data-theme="dark"] {
+            /* Dark theme colors */
+            --bg-primary: #111827;
+            --bg-secondary: #1f2937;
+            --bg-tertiary: #374151;
+            --bg-quaternary: #4b5563;
+            --text-primary: #f9fafb;
+            --text-secondary: #d1d5db;
+            --text-tertiary: #9ca3af;
+            --border-primary: #374151;
+            --border-secondary: #4b5563;
+            --shadow-primary: rgba(0, 0, 0, 0.3);
+            --shadow-secondary: rgba(0, 0, 0, 0.2);
+            --overlay: rgba(0, 0, 0, 0.7);
+            
+            /* Status backgrounds (darker) */
+            --status-running-bg: #1e3a8a;
+            --status-completed-bg: #064e3b;
+            --status-failed-bg: #7f1d1d;
+            --status-pending-bg: #374151;
+            
+            /* Status text (lighter) */
+            --status-running-text: #93c5fd;
+            --status-completed-text: #6ee7b7;
+            --status-failed-text: #fca5a5;
+            --status-pending-text: #d1d5db;
+            
+            /* Resource info (darker) */
+            --resource-bg: #1e3a8a;
+            --resource-border: #1d4ed8;
+            --resource-label: #93c5fd;
+            --resource-value: #dbeafe;
+            
+            /* Error info (darker) */
+            --error-bg: #7f1d1d;
+            --error-border: #dc2626;
+            --error-text: #fca5a5;
+        }
+
         * {
             margin: 0;
             padding: 0;
@@ -13,9 +98,10 @@
 
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background-color: #f9fafb;
-            color: #111827;
+            background-color: var(--bg-primary);
+            color: var(--text-primary);
             padding: 20px;
+            transition: background-color 0.3s ease, color 0.3s ease;
         }
 
         .container {
@@ -25,27 +111,51 @@
 
         .header {
             margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
         }
 
-        .header h1 {
+        .header-content h1 {
             font-size: 24px;
             font-weight: bold;
             margin-bottom: 8px;
+            color: var(--text-primary);
         }
 
-        .header p {
-            color: #6b7280;
+        .header-content p {
+            color: var(--text-secondary);
             font-size: 14px;
+        }
+
+        .theme-toggle {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-primary);
+            border-radius: 8px;
+            padding: 8px 12px;
+            cursor: pointer;
+            font-size: 14px;
+            color: var(--text-primary);
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .theme-toggle:hover {
+            background: var(--bg-quaternary);
+            border-color: var(--border-secondary);
         }
 
         .graph-container {
             position: relative;
             width: 100%;
             height: 600px;
-            background: white;
-            border: 1px solid #e5e7eb;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-primary);
             border-radius: 8px;
             overflow: hidden;
+            transition: background-color 0.3s ease, border-color 0.3s ease;
         }
 
         .graph-controls {
@@ -56,35 +166,38 @@
             display: flex;
             flex-direction: column;
             gap: 8px;
-            background: white;
-            border: 1px solid #e5e7eb;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-primary);
             border-radius: 8px;
             padding: 8px;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            box-shadow: 0 4px 6px var(--shadow-primary);
+            transition: all 0.3s ease;
         }
 
         .graph-controls button {
             padding: 4px 8px;
             border: none;
             border-radius: 4px;
-            background: #f3f4f6;
+            background: var(--bg-quaternary);
             cursor: pointer;
             font-size: 14px;
             min-width: 40px;
+            color: var(--text-primary);
+            transition: all 0.2s ease;
         }
 
         .graph-controls button:hover {
-            background: #e5e7eb;
+            background: var(--border-primary);
         }
 
         .reset-btn {
-            background: #dbeafe !important;
-            color: #1e40af !important;
+            background: var(--status-running-bg) !important;
+            color: var(--status-running-text) !important;
             font-size: 12px !important;
         }
 
         .refresh-btn {
-            background: #10b981 !important;
+            background: var(--status-completed) !important;
             color: white !important;
             font-size: 12px !important;
         }
@@ -94,12 +207,14 @@
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%);
-            background: white;
+            background: var(--bg-secondary);
             padding: 20px;
             border-radius: 8px;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            box-shadow: 0 4px 6px var(--shadow-primary);
             display: none;
             z-index: 20;
+            color: var(--text-primary);
+            transition: all 0.3s ease;
         }
 
         .loading-indicator.show {
@@ -110,13 +225,15 @@
             position: absolute;
             top: 16px;
             left: 16px;
-            background: #fee2e2;
-            color: #dc2626;
+            background: var(--error-bg);
+            color: var(--error-text);
             padding: 8px 12px;
             border-radius: 6px;
             font-size: 12px;
             display: none;
             z-index: 20;
+            border: 1px solid var(--error-border);
+            transition: all 0.3s ease;
         }
 
         .error-indicator.show {
@@ -134,7 +251,7 @@
             left: 50%;
             transform: translate(-50%, -50%);
             text-align: center;
-            color: #6b7280;
+            color: var(--text-secondary);
             display: none;
         }
 
@@ -142,16 +259,16 @@
             display: block;
         }
 
-        /* Tooltip Styles */
+        /* Simplified Tooltip Styles */
         .tooltip {
             position: absolute;
-            background: white;
-            border: 1px solid #e5e7eb;
-            border-radius: 8px;
-            padding: 12px;
-            box-shadow: 0 10px 15px rgba(0, 0, 0, 0.1);
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-primary);
+            border-radius: 6px;
+            padding: 8px 12px;
+            box-shadow: 0 4px 6px var(--shadow-primary);
             font-size: 12px;
-            max-width: 250px;
+            max-width: 200px;
             z-index: 1000;
             pointer-events: none;
             opacity: 0;
@@ -164,37 +281,15 @@
 
         .tooltip-header {
             font-weight: 600;
-            margin-bottom: 8px;
-            color: #111827;
-            font-size: 14px;
-        }
-
-        .tooltip-group {
-            color: #6b7280;
-            margin-bottom: 8px;
-            font-style: italic;
-        }
-
-        .tooltip-status {
-            display: inline-block;
-            padding: 3px 8px;
-            border-radius: 4px;
-            font-size: 11px;
-            font-weight: 500;
-            margin-bottom: 8px;
+            margin-bottom: 6px;
+            color: var(--text-primary);
+            font-size: 13px;
         }
 
         .tooltip-breakdown {
             font-size: 11px;
-            color: #6b7280;
-            margin-bottom: 4px;
-        }
-
-        .tooltip-count {
-            font-size: 11px;
-            color: #6b7280;
-            text-align: center;
-            font-style: italic;
+            color: var(--text-secondary);
+            line-height: 1.4;
         }
 
         /* Modal Styles */
@@ -204,11 +299,12 @@
             left: 0;
             width: 100%;
             height: 100%;
-            background: rgba(0, 0, 0, 0.5);
+            background: var(--overlay);
             display: none;
             align-items: center;
             justify-content: center;
             z-index: 1000;
+            transition: background-color 0.3s ease;
         }
 
         .modal.show {
@@ -216,14 +312,15 @@
         }
 
         .modal-content {
-            background: white;
+            background: var(--bg-secondary);
             border-radius: 12px;
-            box-shadow: 0 20px 25px rgba(0, 0, 0, 0.15);
+            box-shadow: 0 20px 25px var(--shadow-primary);
             max-width: 800px;
             max-height: 80vh;
             width: 90%;
             overflow: hidden;
             animation: modalSlideIn 0.2s ease-out;
+            transition: background-color 0.3s ease;
         }
 
         @keyframes modalSlideIn {
@@ -239,22 +336,23 @@
 
         .modal-header {
             padding: 24px 24px 16px 24px;
-            border-bottom: 1px solid #e5e7eb;
+            border-bottom: 1px solid var(--border-primary);
             display: flex;
             align-items: flex-start;
             justify-content: space-between;
+            transition: border-color 0.3s ease;
         }
 
         .modal-title {
             font-size: 20px;
             font-weight: 600;
-            color: #111827;
+            color: var(--text-primary);
             margin-bottom: 4px;
         }
 
         .modal-subtitle {
             font-size: 14px;
-            color: #6b7280;
+            color: var(--text-secondary);
             display: flex;
             align-items: center;
             gap: 16px;
@@ -271,12 +369,12 @@
             align-items: center;
             gap: 4px;
             font-size: 12px;
-            color: #6b7280;
+            color: var(--text-secondary);
         }
 
         .stat-value {
             font-weight: 600;
-            color: #111827;
+            color: var(--text-primary);
         }
 
         .close-btn {
@@ -284,15 +382,16 @@
             border: none;
             font-size: 24px;
             cursor: pointer;
-            color: #9ca3af;
+            color: var(--text-tertiary);
             padding: 4px;
             border-radius: 4px;
             line-height: 1;
+            transition: all 0.2s ease;
         }
 
         .close-btn:hover {
-            color: #6b7280;
-            background: #f3f4f6;
+            color: var(--text-secondary);
+            background: var(--bg-quaternary);
         }
 
         .modal-body {
@@ -307,18 +406,18 @@
         }
 
         .job-card {
-            border: 1px solid #e5e7eb;
+            border: 1px solid var(--border-primary);
             border-radius: 8px;
             padding: 16px;
             transition: all 0.2s;
-            background: #fafafa;
+            background: var(--bg-tertiary);
         }
 
         .job-card:hover {
-            background: #f3f4f6;
-            border-color: #d1d5db;
+            background: var(--bg-quaternary);
+            border-color: var(--border-secondary);
             transform: translateY(-1px);
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+            box-shadow: 0 4px 6px var(--shadow-secondary);
         }
 
         .job-header {
@@ -332,7 +431,7 @@
             font-family: monospace;
             font-weight: 600;
             font-size: 16px;
-            color: #111827;
+            color: var(--text-primary);
         }
 
         .job-status {
@@ -347,14 +446,15 @@
 
         .job-command {
             font-family: monospace;
-            background: #f3f4f6;
+            background: var(--bg-quaternary);
             padding: 8px 12px;
             border-radius: 6px;
             font-size: 13px;
-            color: #374151;
+            color: var(--text-secondary);
             margin-bottom: 12px;
-            border-left: 3px solid #e5e7eb;
+            border-left: 3px solid var(--border-primary);
             word-break: break-all;
+            transition: all 0.3s ease;
         }
 
         .job-details {
@@ -371,7 +471,7 @@
         }
 
         .job-detail-label {
-            color: #6b7280;
+            color: var(--text-secondary);
             font-weight: 500;
             font-size: 11px;
             text-transform: uppercase;
@@ -379,7 +479,7 @@
         }
 
         .job-detail-value {
-            color: #111827;
+            color: var(--text-primary);
         }
 
         .dependency-list {
@@ -389,8 +489,8 @@
         }
 
         .dependency-tag {
-            background: #e0e7ff;
-            color: #3730a3;
+            background: var(--status-running-bg);
+            color: var(--status-running-text);
             padding: 2px 6px;
             border-radius: 4px;
             font-size: 11px;
@@ -399,11 +499,12 @@
         }
 
         .resource-info {
-            background: #f0f9ff;
-            border: 1px solid #e0f2fe;
+            background: var(--resource-bg);
+            border: 1px solid var(--resource-border);
             border-radius: 6px;
             padding: 8px;
             margin-top: 8px;
+            transition: all 0.3s ease;
         }
 
         .resource-item {
@@ -419,35 +520,51 @@
         }
 
         .resource-label {
-            color: #0369a1;
+            color: var(--resource-label);
             font-weight: 500;
         }
 
         .resource-value {
-            color: #0c4a6e;
+            color: var(--resource-value);
             font-family: monospace;
         }
 
         .progress-bar {
             width: 100%;
             height: 6px;
-            background: #e5e7eb;
+            background: var(--border-primary);
             border-radius: 3px;
             overflow: hidden;
             margin-top: 4px;
+            transition: background-color 0.3s ease;
         }
 
         .progress-fill {
             height: 100%;
-            background: linear-gradient(90deg, #3b82f6, #1d4ed8);
+            background: linear-gradient(90deg, var(--status-running), #1d4ed8);
             transition: width 0.3s ease;
         }
 
-        .status-running { background: #dbeafe; color: #1e40af; }
-        .status-completed { background: #d1fae5; color: #065f46; }
-        .status-failed { background: #fee2e2; color: #991b1b; }
-        .status-pending { background: #f3f4f6; color: #374151; }
-        .status-mixed { background: linear-gradient(135deg, #fbbf24, #f59e0b, #d97706); color: white; }
+        .status-running { 
+            background: var(--status-running-bg); 
+            color: var(--status-running-text); 
+        }
+        .status-completed { 
+            background: var(--status-completed-bg); 
+            color: var(--status-completed-text); 
+        }
+        .status-failed { 
+            background: var(--status-failed-bg); 
+            color: var(--status-failed-text); 
+        }
+        .status-pending { 
+            background: var(--status-pending-bg); 
+            color: var(--status-pending-text); 
+        }
+        .status-mixed { 
+            background: linear-gradient(135deg, #fbbf24, #f59e0b, #d97706); 
+            color: white; 
+        }
 
         .status-icon {
             width: 12px;
@@ -456,18 +573,38 @@
             display: inline-block;
         }
 
-        .icon-running { background: #3b82f6; }
-        .icon-completed { background: #10b981; }
-        .icon-failed { background: #ef4444; }
-        .icon-pending { background: #f59e0b; }
+        .icon-running { background: var(--status-running); }
+        .icon-completed { background: var(--status-completed); }
+        .icon-failed { background: var(--status-failed); }
+        .icon-pending { background: var(--status-pending); }
         .icon-mixed { background: linear-gradient(135deg, #fbbf24, #f59e0b, #d97706); }
+
+        /* Error info specific styling */
+        .error-info {
+            background: var(--error-bg) !important;
+            border-color: var(--error-border) !important;
+        }
+
+        .error-info .resource-label {
+            color: var(--error-text) !important;
+        }
+
+        .error-info .resource-value {
+            color: var(--error-text) !important;
+        }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="header">
-            <h1>SLURM Dependency Graph</h1>
-            <p>Professional dependency visualization. Click nodes for details, hover for quick info.</p>
+            <div class="header-content">
+                <h1>SLURM Dependency Graph</h1>
+                <p>Professional dependency visualization. Click nodes for details, hover for quick info.</p>
+            </div>
+            <button class="theme-toggle" onclick="toggleTheme()">
+                <span id="theme-icon">🌙</span>
+                <span id="theme-text">Dark</span>
+            </button>
         </div>
 
         <div class="graph-container">
@@ -496,7 +633,7 @@
         </div>
     </div>
 
-    <!-- Tooltip -->
+    <!-- Simplified Tooltip -->
     <div id="tooltip" class="tooltip"></div>
 
     <!-- Enhanced Modal -->
@@ -519,6 +656,59 @@
     <script>
         // Show fallback message initially
         document.getElementById('fallback').classList.add('show');
+
+        // Theme management
+        let currentTheme = 'light';
+
+        function initTheme() {
+            // Check for saved theme preference or default to 'light'
+            const savedTheme = localStorage.getItem('theme') || 'light';
+            currentTheme = savedTheme;
+            document.documentElement.setAttribute('data-theme', currentTheme);
+            updateThemeButton();
+        }
+
+        function toggleTheme() {
+            currentTheme = currentTheme === 'light' ? 'dark' : 'light';
+            document.documentElement.setAttribute('data-theme', currentTheme);
+            localStorage.setItem('theme', currentTheme);
+            updateThemeButton();
+            
+            // Re-render graph with new theme colors
+            if (librariesLoaded && jobs.length > 0) {
+                renderGraph();
+            }
+        }
+
+        function updateThemeButton() {
+            const themeIcon = document.getElementById('theme-icon');
+            const themeText = document.getElementById('theme-text');
+            
+            if (currentTheme === 'dark') {
+                themeIcon.textContent = '☀️';
+                themeText.textContent = 'Light';
+            } else {
+                themeIcon.textContent = '🌙';
+                themeText.textContent = 'Dark';
+            }
+        }
+
+        function getThemeColors() {
+            const root = document.documentElement;
+            const style = getComputedStyle(root);
+            
+            return {
+                bgPrimary: style.getPropertyValue('--bg-primary').trim(),
+                bgSecondary: style.getPropertyValue('--bg-secondary').trim(),
+                textPrimary: style.getPropertyValue('--text-primary').trim(),
+                textSecondary: style.getPropertyValue('--text-secondary').trim(),
+                borderPrimary: style.getPropertyValue('--border-primary').trim(),
+                statusRunning: style.getPropertyValue('--status-running').trim(),
+                statusCompleted: style.getPropertyValue('--status-completed').trim(),
+                statusFailed: style.getPropertyValue('--status-failed').trim(),
+                statusPending: style.getPropertyValue('--status-pending').trim()
+            };
+        }
 
         // Dummy job data for development
         const DUMMY_JOBS = [
@@ -758,7 +948,7 @@
                 case "completed": return "#10b981";
                 case "failed": return "#ef4444";
                 case "pending": return "#f59e0b";
-                case "mixed": return "#d97706"; // Changed to a warm orange/amber color
+                case "mixed": return "#d97706";
                 default: return "#6b7280";
             }
         }
@@ -789,6 +979,40 @@
         function formatTime(timeString) {
             if (!timeString) return "N/A";
             return new Date(timeString).toLocaleTimeString();
+        }
+
+        // Updated color logic based on new rules
+        function getNodeColor(jobs) {
+            const statuses = jobs.map(job => job.status);
+            
+            // Rule 3: Use active color (blue) if at least one job is running
+            if (statuses.includes("RUNNING")) {
+                return "RUNNING";
+            }
+            
+            // Rule 1: Use failed color (red) only if ALL jobs have failed
+            if (statuses.every(status => status === "FAILED")) {
+                return "FAILED";
+            }
+            
+            // Rule 2: Use pending color (orange) only if ALL jobs are pending
+            if (statuses.every(status => status === "PENDING")) {
+                return "PENDING";
+            }
+            
+            // Rule 4: Otherwise use completed color (green)
+            return "COMPLETED";
+        }
+
+        // Calculate progress: (completed + failed) / total
+        function calculateProgress(jobs) {
+            if (jobs.length === 0) return 0;
+            
+            const finishedJobs = jobs.filter(job => 
+                job.status === "COMPLETED" || job.status === "FAILED"
+            ).length;
+            
+            return Math.round((finishedJobs / jobs.length) * 100);
         }
 
         // Create node groups based on dependencies
@@ -828,11 +1052,16 @@
             let groupIndex = 0;
 
             groupMap.forEach(groupJobs => {
+                const progress = calculateProgress(groupJobs);
+                const nodeColor = getNodeColor(groupJobs);
+                
                 groups.push({
                     id: `group_${groupIndex++}`,
                     jobs: groupJobs,
                     parents: new Set(groupJobs[0].depends_on),
-                    children: parentToChildMap.get(groupJobs[0].job_id.toString()) || new Set()
+                    children: parentToChildMap.get(groupJobs[0].job_id.toString()) || new Set(),
+                    progress: progress,
+                    nodeColor: nodeColor
                 });
             });
 
@@ -867,7 +1096,7 @@
             return "MIXED";
         }
 
-        // Get status breakdown for tooltips and modals
+        // Get status breakdown for simplified tooltips
         function getStatusBreakdown(jobs) {
             const counts = {
                 COMPLETED: 0,
@@ -881,43 +1110,36 @@
             });
             
             const parts = [];
-            if (counts.COMPLETED > 0) parts.push(`${counts.COMPLETED} COMPLETED`);
-            if (counts.RUNNING > 0) parts.push(`${counts.RUNNING} RUNNING`);
-            if (counts.FAILED > 0) parts.push(`${counts.FAILED} FAILED`);
-            if (counts.PENDING > 0) parts.push(`${counts.PENDING} PENDING`);
+            if (counts.COMPLETED > 0) parts.push(`${counts.COMPLETED} completed`);
+            if (counts.RUNNING > 0) parts.push(`${counts.RUNNING} running`);
+            if (counts.FAILED > 0) parts.push(`${counts.FAILED} failed`);
+            if (counts.PENDING > 0) parts.push(`${counts.PENDING} pending`);
             
-            return parts.join(', ');
+            return parts.join(' • ');
         }
 
-        // Tooltip functions
+        // Simplified tooltip function
         function showTooltip(event, group) {
             const tooltip = document.getElementById('tooltip');
-            const groupStatus = getGroupStatus(group.jobs);
-            const breakdown = getStatusBreakdown(group.jobs);
             const jobIds = group.jobs.map(j => j.job_id);
             const displayText = smartRangeDisplay(jobIds);
+            const breakdown = getStatusBreakdown(group.jobs);
             
             tooltip.innerHTML = `
                 <div class="tooltip-header">Group #${displayText}</div>
-                <div class="tooltip-group">${group.jobs[0].group_name}</div>
-                <span class="tooltip-status ${getStatusClass(groupStatus)}">${groupStatus}</span>
-                ${groupStatus === "MIXED" ? `<div class="tooltip-breakdown">${breakdown}</div>` : ''}
-                <div class="tooltip-count">${group.jobs.length} job${group.jobs.length > 1 ? 's' : ''} total</div>
+                <div class="tooltip-breakdown">${breakdown}</div>
             `;
             
             // Position tooltip
-            const rect = event.target.getBoundingClientRect();
-            const tooltipRect = tooltip.getBoundingClientRect();
-            
             let left = event.clientX + 10;
             let top = event.clientY - 10;
             
             // Adjust if tooltip would go off screen
-            if (left + 250 > window.innerWidth) {
-                left = event.clientX - 260;
+            if (left + 200 > window.innerWidth) {
+                left = event.clientX - 210;
             }
-            if (top + tooltipRect.height > window.innerHeight) {
-                top = event.clientY - tooltipRect.height - 10;
+            if (top + 60 > window.innerHeight) {
+                top = event.clientY - 70;
             }
             
             tooltip.style.left = left + 'px';
@@ -934,25 +1156,37 @@
             if (jobs.length === 0 || !librariesLoaded) return;
             
             const groups = createGroups();
+            const themeColors = getThemeColors();
             
             // Prepare nodes and edges for Cytoscape
             const elements = [];
             
             // Add nodes
             groups.forEach(group => {
-                const groupStatus = getGroupStatus(group.jobs);
                 const jobIds = group.jobs.map(j => j.job_id);
                 const displayText = smartRangeDisplay(jobIds);
                 const groupName = group.jobs[0].group_name || "root";
+                const progress = group.progress;
+                const nodeColor = group.nodeColor;
+                
+                // Get color based on new rules
+                const backgroundColor = getStatusColor(nodeColor);
+                const borderColor = getStatusColor(nodeColor);
+                
+                // Simple label like the original
+                const label = `#${displayText}\n${groupName}\n${progress}% done`;
                 
                 elements.push({
                     data: {
                         id: group.id,
-                        label: `#${displayText}\n${groupName}\n${groupStatus}`,
-                        status: groupStatus,
+                        label: label,
                         jobs: group.jobs,
                         displayText: displayText,
-                        groupName: groupName
+                        groupName: groupName,
+                        progress: progress,
+                        nodeColor: nodeColor,
+                        backgroundColor: backgroundColor,
+                        borderColor: borderColor
                     }
                 });
             });
@@ -987,11 +1221,11 @@
                             selector: 'node',
                             style: {
                                 'background-color': function(ele) {
-                                    return getStatusColor(ele.data('status'));
+                                    return ele.data('backgroundColor');
                                 },
-                                'background-opacity': 0.1,
+                                'background-opacity': 0.15,
                                 'border-color': function(ele) {
-                                    return getStatusColor(ele.data('status'));
+                                    return ele.data('borderColor');
                                 },
                                 'border-width': 2,
                                 'border-opacity': 0.8,
@@ -1000,11 +1234,11 @@
                                 'text-halign': 'center',
                                 'font-size': '12px',
                                 'font-weight': 'bold',
-                                'color': '#111827',
+                                'color': themeColors.textPrimary,
                                 'text-wrap': 'wrap',
                                 'text-max-width': '140px',
                                 'width': '160px',
-                                'height': '80px',
+                                'height': '60px',
                                 'shape': 'round-rectangle',
                                 'cursor': 'pointer'
                             }
@@ -1014,15 +1248,15 @@
                             style: {
                                 'border-width': 3,
                                 'border-opacity': 1,
-                                'background-opacity': 0.2
+                                'background-opacity': 0.25
                             }
                         },
                         {
                             selector: 'edge',
                             style: {
                                 'width': 2,
-                                'line-color': '#6b7280',
-                                'target-arrow-color': '#6b7280',
+                                'line-color': themeColors.textSecondary,
+                                'target-arrow-color': themeColors.textSecondary,
                                 'target-arrow-shape': 'triangle',
                                 'curve-style': 'bezier',
                                 'control-point-step-size': 40,
@@ -1033,8 +1267,8 @@
                             selector: 'edge:hover',
                             style: {
                                 'width': 3,
-                                'line-color': '#374151',
-                                'target-arrow-color': '#374151'
+                                'line-color': themeColors.textPrimary,
+                                'target-arrow-color': themeColors.textPrimary
                             }
                         }
                     ],
@@ -1064,7 +1298,7 @@
                     showGroupDetails(group);
                 });
 
-                // Add hover event listeners for tooltips
+                // Add hover event listeners for simplified tooltips
                 cy.on('mouseover', 'node', function(evt) {
                     const node = evt.target;
                     const group = {
@@ -1101,15 +1335,15 @@
             hideFallback();
             const cyContainer = document.getElementById('cy');
             cyContainer.innerHTML = `
-                <div style="display: flex; align-items: center; justify-content: center; height: 100%; flex-direction: column; color: #6b7280;">
+                <div style="display: flex; align-items: center; justify-content: center; height: 100%; flex-direction: column; color: var(--text-secondary);">
                     <div style="font-size: 18px; margin-bottom: 8px;">📊 Simple Graph View</div>
                     <div style="font-size: 14px; margin-bottom: 16px;">External libraries couldn't load, showing basic view</div>
                     <div style="display: grid; gap: 12px; max-width: 600px;">
                         ${jobs.map(job => `
-                            <div style="border: 1px solid #e5e7eb; border-radius: 8px; padding: 12px; background: white;">
-                                <div style="font-weight: bold; margin-bottom: 4px;">#${job.job_id} - ${job.status}</div>
-                                <div style="font-size: 12px; color: #6b7280;">${job.group_name}</div>
-                                <div style="font-size: 11px; color: #9ca3af; margin-top: 4px;">${job.command}</div>
+                            <div style="border: 1px solid var(--border-primary); border-radius: 8px; padding: 12px; background: var(--bg-secondary);">
+                                <div style="font-weight: bold; margin-bottom: 4px; color: var(--text-primary);">#${job.job_id} - ${job.status}</div>
+                                <div style="font-size: 12px; color: var(--text-secondary);">${job.group_name}</div>
+                                <div style="font-size: 11px; color: var(--text-tertiary); margin-top: 4px;">${job.command}</div>
                             </div>
                         `).join('')}
                     </div>
@@ -1217,10 +1451,10 @@
                 let errorInfo = '';
                 if (job.status === "FAILED" && job.error_message) {
                     errorInfo = `
-                        <div class="resource-info" style="background: #fef2f2; border-color: #fecaca;">
+                        <div class="resource-info error-info">
                             <div class="resource-item">
-                                <span class="resource-label" style="color: #dc2626;">Error</span>
-                                <span class="resource-value" style="color: #dc2626;">${job.error_message}</span>
+                                <span class="resource-label">Error</span>
+                                <span class="resource-value">${job.error_message}</span>
                             </div>
                         </div>
                     `;
@@ -1296,6 +1530,9 @@
         // Initialize the application
         async function init() {
             try {
+                // Initialize theme first
+                initTheme();
+                
                 // Try to load external libraries
                 try {
                     await loadLibraries();
@@ -1325,7 +1562,7 @@
                 // Show basic fallback
                 const cyContainer = document.getElementById('cy');
                 cyContainer.innerHTML = `
-                    <div style="display: flex; align-items: center; justify-content: center; height: 100%; color: #dc2626;">
+                    <div style="display: flex; align-items: center; justify-content: center; height: 100%; color: var(--error-text);">
                         <div>Failed to initialize application. Please refresh the page.</div>
                     </div>
                 `;

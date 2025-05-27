@@ -183,6 +183,7 @@ group:
 - [x] Web app
 
 ## Planned Features
+- [ ] Update afterany (allow some parent group failures)
 - [ ] View job logs in the web
 
 ## Requirements
