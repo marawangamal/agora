@@ -4,6 +4,7 @@ import appdirs
 from pathlib import Path
 from jrun.job_submitter import JobSubmitter
 from jrun.job_viewer import JobViewer
+from jrun.jrun_server_v2 import serve
 from jrun.jweb_server import serve_react_app  # Updated import
 
 
@@ -131,11 +132,6 @@ def parse_args():
     )
     p_serve.add_argument("--db", default=default_db, help="SQLite DB path")
     p_serve.add_argument(
-        "--build-dir",
-        default=None,
-        help="Build directory path (auto-detected if not specified)",
-    )
-    p_serve.add_argument(
         "--no-browser", action="store_true", help="Don't open browser automatically"
     )
 
@@ -243,27 +239,31 @@ def main():
     # Start web server
     elif args.cmd == "serve":
         try:
-            # Auto-detect build directory if not specified
-            build_dir = args.build_dir or get_build_directory()
+            # # Auto-detect build directory if not specified
+            # build_dir = args.build_dir or get_build_directory()
 
-            print(f"🔍 Looking for Next.js build at: {build_dir}")
+            # print(f"🔍 Looking for Next.js build at: {build_dir}")
 
-            # Check if build directory exists
-            if not Path(build_dir).exists():
-                print(f"❌ Build directory not found: {build_dir}")
-                print(f"💡 Please build your Next.js app first:")
-                print(f"   cd jweb && npm run build")
-                exit(1)
+            # # Check if build directory exists
+            # if not Path(build_dir).exists():
+            #     print(f"❌ Build directory not found: {build_dir}")
+            #     print(f"💡 Please build your Next.js app first:")
+            #     print(f"   cd jweb && npm run build")
+            #     exit(1)
 
-            serve_react_app(
-                port=args.port,
+            # serve_react_app(
+            #     port=args.port,
+            #     host=args.host,
+            #     build_dir=build_dir,
+            #     open_browser=False,
+            #     blocking=True,
+            # )
+            serve(
+                db=args.db,
                 host=args.host,
-                build_dir=build_dir,
-                open_browser=False,
-                blocking=True,
+                port=args.port,
+                web_folder="web",  # relative to project root
             )
-        except KeyboardInterrupt:
-            print("\n👋 Goodbye!")
         except Exception as e:
             print(f"❌ Failed to start server: {e}")
             exit(1)

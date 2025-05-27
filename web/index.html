@@ -1,0 +1,101 @@
+<!-- web/index.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>SLURMM Group Dependency Graph</title>
+  <script type="module">
+    import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+    mermaid.initialize({ startOnLoad: false });
+
+    window.addEventListener('DOMContentLoaded', async () => {
+      // 1) Fetch jobs from our new API
+      const resp = await fetch(`/api/jobs?db=${encodeURIComponent(location.search.slice(4) || '')}`);
+      const jobs = await resp.json();
+
+      // 2) Group + find inter-group edges
+      const groups = {}, edges = new Set();
+      jobs.forEach(j => {
+        groups[j.group_name] = groups[j.group_name] || [];
+        groups[j.group_name].push(j);
+      });
+      jobs.forEach(j => {
+        j.depends_on.forEach(dep => {
+          const p = jobs.find(x => x.job_id.toString() === dep);
+          if (p && p.group_name !== j.group_name) {
+            edges.add(p.group_name + '|' + j.group_name);
+          }
+        });
+      });
+
+      // 3) Build mermaid text
+      let md = 'flowchart LR\n';
+      for (let [name, arr] of Object.entries(groups)) {
+        const id = name.replace(/\s+/g,'_');
+        md += `  ${id}["${name} (${arr.length})"]\n`;
+      }
+      for (let e of edges) {
+        let [p, c] = e.split('|');
+        md += `  ${p.replace(/\s+/g,'_')} --> ${c.replace(/\s+/g,'_')}\n`;
+      }
+
+      // 4) Render it
+      const container = document.getElementById('mermaid');
+      container.textContent = md;
+      mermaid.init(undefined, container);
+
+      // 5) Make nodes clickable
+      setTimeout(() => {
+        document.querySelectorAll('g.node').forEach(g => {
+          const title = g.querySelector('title')?.textContent;
+          if (title && groups[title]) {
+            g.style.cursor = 'pointer';
+            g.addEventListener('click', () => showDetails(title, groups[title]));
+          }
+        });
+      }, 300);
+    });
+
+    function showDetails(groupName, jobs) {
+      const panel = document.getElementById('details'),
+            list  = panel.querySelector('ul');
+      list.innerHTML = '';
+      jobs.forEach(j => {
+        const li = document.createElement('li');
+        li.innerHTML = `<strong>#${j.job_id}</strong>: ${j.command}`;
+        list.appendChild(li);
+      });
+      panel.style.display = 'block';
+    }
+    function hideDetails() {
+      document.getElementById('details').style.display = 'none';
+    }
+  </script>
+  <style>
+    body { font-family:sans-serif; padding:1rem }
+    #mermaid { border:1px solid #ccc; padding:1rem }
+    #details {
+      display:none;
+      position:fixed; top:4rem; right:1rem;
+      width:300px; max-height:70vh; overflow:auto;
+      background:white; border:1px solid #888; padding:1rem;
+      box-shadow:0 2px 6px rgba(0,0,0,0.2);
+    }
+    #details button {
+      position:absolute; top:4px; right:4px;
+      background:none; border:none; font-size:1.2em;
+      cursor:pointer;
+    }
+    #details ul { padding-left:1.2em; }
+  </style>
+</head>
+<body>
+  <h1>SLURMM Group Dependency Graph</h1>
+  <div id="mermaid" class="mermaid"></div>
+  <div id="details">
+    <button onclick="hideDetails()">×</button>
+    <h2>Jobs in Group</h2>
+    <ul></ul>
+  </div>
+</body>
+</html>
