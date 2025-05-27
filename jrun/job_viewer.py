@@ -259,6 +259,7 @@ class JobViewer(JobDB):
                     "group_name": job.group_name,
                     "depends_on": job.depends_on,
                     "preamble": job.preamble,
+                    "loop_id": job.loop_id,
                 }
             )
 
@@ -277,10 +278,18 @@ class JobViewer(JobDB):
             return
         table_data = []
         for job in jobs:
-            table_data.append([job.job_id, job.group_name, job.command, job.status])
+            table_data.append(
+                [
+                    job.job_id,
+                    job.group_name,
+                    job.loop_id or "N/A",
+                    job.command,
+                    job.status,
+                ]
+            )
 
         # Print table using tabulate
-        headers = ["ID", "GROUP", "COMMAND", "STATUS"]
+        headers = ["ID", "GROUP", "LOOP" "COMMAND", "STATUS"]
         col_widths = [10, 10, 80, 10]
         # print("\n" + tabulate(table_data, headers=headers, tablefmt="simple"))
         print(
