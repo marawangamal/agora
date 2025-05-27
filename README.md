@@ -179,13 +179,11 @@ group:
 - [x] Job graph vizualization
 - [x] CLI filtering (`jrun status --filter status=COMPLETED`)
 - [x] Job retry (`jrun retry JOB_ID`)
+- [x] Job delete subgraph
+- [x] Web app
 
 ## Planned Features
-- [ ] Job delete subgraph
-- [ ] Job node removal (`jrun remove JOB_ID`)
-- [ ] Real-time monitoring (`jrun watch`)
-<!-- - Resource usage tracking and reporting
-- Web dashboard for team collaboration -->
+- [ ] View job logs in the web
 
 ## Requirements
 

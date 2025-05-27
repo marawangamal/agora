@@ -41,6 +41,7 @@
         .graph-container {
             position: relative;
             width: 100%;
+            height: 600px;
             background: white;
             border: 1px solid #e5e7eb;
             border-radius: 8px;
@@ -82,10 +83,10 @@
             font-size: 12px !important;
         }
 
-        .zoom-level {
-            text-align: center;
-            font-size: 12px;
-            padding: 4px;
+        .refresh-btn {
+            background: #10b981 !important;
+            color: white !important;
+            font-size: 12px !important;
         }
 
         .loading-indicator {
@@ -98,6 +99,7 @@
             border-radius: 8px;
             box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
             display: none;
+            z-index: 20;
         }
 
         .loading-indicator.show {
@@ -114,51 +116,86 @@
             border-radius: 6px;
             font-size: 12px;
             display: none;
+            z-index: 20;
         }
 
         .error-indicator.show {
             display: block;
         }
 
+        #cy {
+            width: 100%;
+            height: 100%;
+        }
+
+        .fallback-message {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            color: #6b7280;
+            display: none;
+        }
+
+        .fallback-message.show {
+            display: block;
+        }
+
+        /* Tooltip Styles */
         .tooltip {
             position: absolute;
             background: white;
             border: 1px solid #e5e7eb;
-            border-radius: 6px;
-            padding: 8px;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            border-radius: 8px;
+            padding: 12px;
+            box-shadow: 0 10px 15px rgba(0, 0, 0, 0.1);
             font-size: 12px;
             max-width: 250px;
-            z-index: 20;
+            z-index: 1000;
             pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.2s ease;
         }
 
-        .tooltip-title {
+        .tooltip.show {
+            opacity: 1;
+        }
+
+        .tooltip-header {
             font-weight: 600;
-            margin-bottom: 4px;
+            margin-bottom: 8px;
+            color: #111827;
+            font-size: 14px;
         }
 
-        .tooltip-command {
+        .tooltip-group {
             color: #6b7280;
-            font-family: monospace;
-            background: #f3f4f6;
-            padding: 2px 4px;
-            border-radius: 3px;
-            margin-bottom: 4px;
+            margin-bottom: 8px;
+            font-style: italic;
         }
 
         .tooltip-status {
             display: inline-block;
-            padding: 2px 6px;
+            padding: 3px 8px;
             border-radius: 4px;
-            font-size: 10px;
+            font-size: 11px;
             font-weight: 500;
+            margin-bottom: 8px;
         }
 
-        .status-running { background: #dbeafe; color: #1e40af; }
-        .status-completed { background: #d1fae5; color: #065f46; }
-        .status-failed { background: #fee2e2; color: #991b1b; }
-        .status-pending { background: #f3f4f6; color: #374151; }
+        .tooltip-breakdown {
+            font-size: 11px;
+            color: #6b7280;
+            margin-bottom: 4px;
+        }
+
+        .tooltip-count {
+            font-size: 11px;
+            color: #6b7280;
+            text-align: center;
+            font-style: italic;
+        }
 
         /* Modal Styles */
         .modal {
@@ -406,9 +443,11 @@
             transition: width 0.3s ease;
         }
 
-        .hidden {
-            display: none;
-        }
+        .status-running { background: #dbeafe; color: #1e40af; }
+        .status-completed { background: #d1fae5; color: #065f46; }
+        .status-failed { background: #fee2e2; color: #991b1b; }
+        .status-pending { background: #f3f4f6; color: #374151; }
+        .status-mixed { background: linear-gradient(135deg, #fbbf24, #f59e0b, #d97706); color: white; }
 
         .status-icon {
             width: 12px;
@@ -421,19 +460,14 @@
         .icon-completed { background: #10b981; }
         .icon-failed { background: #ef4444; }
         .icon-pending { background: #f59e0b; }
-
-        .refresh-btn {
-            background: #10b981 !important;
-            color: white !important;
-            font-size: 12px !important;
-        }
+        .icon-mixed { background: linear-gradient(135deg, #fbbf24, #f59e0b, #d97706); }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="header">
             <h1>SLURM Dependency Graph</h1>
-            <p>Visual representation of job dependencies. Click nodes for details, drag to pan.</p>
+            <p>Professional dependency visualization. Click nodes for details, hover for quick info.</p>
         </div>
 
         <div class="graph-container">
@@ -445,18 +479,25 @@
                 Failed to load jobs. Using dummy data.
             </div>
             
+            <div class="fallback-message" id="fallback">
+                <div>Loading graph library...</div>
+                <div style="margin-top: 8px; font-size: 12px;">If this persists, there may be a network issue.</div>
+            </div>
+            
             <div class="graph-controls">
                 <button onclick="refreshJobs()" class="refresh-btn">↻</button>
+                <button onclick="fitGraph()">Fit</button>
                 <button onclick="zoomIn()">+</button>
-                <div class="zoom-level" id="zoom-level">100%</div>
                 <button onclick="zoomOut()">-</button>
                 <button class="reset-btn" onclick="resetView()">Reset</button>
             </div>
-            <svg id="graph" width="100%" height="600"></svg>
+            
+            <div id="cy"></div>
         </div>
-
-        <div id="tooltip" class="tooltip hidden"></div>
     </div>
+
+    <!-- Tooltip -->
+    <div id="tooltip" class="tooltip"></div>
 
     <!-- Enhanced Modal -->
     <div id="modal" class="modal">
@@ -476,6 +517,9 @@
     </div>
 
     <script>
+        // Show fallback message initially
+        document.getElementById('fallback').classList.add('show');
+
         // Dummy job data for development
         const DUMMY_JOBS = [
             {
@@ -593,21 +637,46 @@
 
         // Global state
         let jobs = [];
-        let zoom = 1;
-        let panX = 0;
-        let panY = 0;
-        let isDragging = false;
-        let lastMouseX = 0;
-        let lastMouseY = 0;
-        let currentGroups = [];
+        let cy = null;
         let isLoading = false;
+        let librariesLoaded = false;
+        let tooltip = null;
+
+        // Function to load external libraries
+        function loadLibraries() {
+            return new Promise((resolve, reject) => {
+                // Load Cytoscape.js
+                const cytoscapeScript = document.createElement('script');
+                cytoscapeScript.src = 'https://cdnjs.cloudflare.com/ajax/libs/cytoscape/3.26.0/cytoscape.min.js';
+                cytoscapeScript.onload = () => {
+                    // Load Dagre layout extension
+                    const dagreScript = document.createElement('script');
+                    dagreScript.src = 'https://cdnjs.cloudflare.com/ajax/libs/dagre/0.8.5/dagre.min.js';
+                    dagreScript.onload = () => {
+                        // Load Cytoscape-Dagre extension
+                        const cytoscapeDagreScript = document.createElement('script');
+                        cytoscapeDagreScript.src = 'https://cdn.jsdelivr.net/npm/cytoscape-dagre@2.5.0/cytoscape-dagre.js';
+                        cytoscapeDagreScript.onload = () => {
+                            librariesLoaded = true;
+                            resolve();
+                        };
+                        cytoscapeDagreScript.onerror = reject;
+                        document.head.appendChild(cytoscapeDagreScript);
+                    };
+                    dagreScript.onerror = reject;
+                    document.head.appendChild(dagreScript);
+                };
+                cytoscapeScript.onerror = reject;
+                document.head.appendChild(cytoscapeScript);
+            });
+        }
 
         // Function to fetch jobs from API or return dummy data
         async function getJobs() {
             try {
                 setLoading(true);
                 hideError();
-
+                
                 // Uncomment these lines to enable API calls:
                 const response = await fetch('/api/jobs');
                 if (!response.ok) {
@@ -615,7 +684,7 @@
                 }
                 const data = await response.json();
                 console.log('Fetched jobs from API:', data);
-                return data
+                return data;
 
                 // For development, simulate API delay and return dummy data
                 await new Promise(resolve => setTimeout(resolve, 500));
@@ -659,6 +728,10 @@
             document.getElementById('error').classList.remove('show');
         }
 
+        function hideFallback() {
+            document.getElementById('fallback').classList.remove('show');
+        }
+
         // Refresh jobs function
         async function refreshJobs() {
             if (isLoading) return;
@@ -666,7 +739,11 @@
             try {
                 const newJobs = await getJobs();
                 jobs = newJobs;
-                renderGraph();
+                if (librariesLoaded) {
+                    renderGraph();
+                } else {
+                    renderSimpleGraph();
+                }
                 console.log('Jobs refreshed successfully');
             } catch (error) {
                 console.error('Failed to refresh jobs:', error);
@@ -681,6 +758,7 @@
                 case "completed": return "#10b981";
                 case "failed": return "#ef4444";
                 case "pending": return "#f59e0b";
+                case "mixed": return "#d97706"; // Changed to a warm orange/amber color
                 default: return "#6b7280";
             }
         }
@@ -745,7 +823,7 @@
                 groupMap.get(signature).push(job);
             });
 
-            // Convert to groups with positions
+            // Convert to groups
             const groups = [];
             let groupIndex = 0;
 
@@ -759,74 +837,6 @@
             });
 
             return groups;
-        }
-
-        // Calculate positions using a simple layered layout
-        function calculatePositions(groups) {
-            // Calculate levels
-            const levels = new Map();
-            const visited = new Set();
-
-            function calculateLevel(groupId) {
-                if (levels.has(groupId)) return levels.get(groupId);
-                if (visited.has(groupId)) return 0;
-
-                visited.add(groupId);
-                const group = groups.find(g => g.id === groupId);
-                const parentGroups = Array.from(group.parents)
-                    .map(parentId => groups.find(g => g.jobs.some(j => j.job_id.toString() === parentId)))
-                    .filter(Boolean);
-
-                const maxParentLevel = parentGroups.length > 0 
-                    ? Math.max(...parentGroups.map(pg => calculateLevel(pg.id))) 
-                    : -1;
-
-                const level = maxParentLevel + 1;
-                levels.set(groupId, level);
-                group.level = level;
-                visited.delete(groupId);
-                return level;
-            }
-
-            groups.forEach(group => calculateLevel(group.id));
-
-            // Position groups
-            const levelGroups = new Map();
-            groups.forEach(group => {
-                if (!levelGroups.has(group.level)) {
-                    levelGroups.set(group.level, []);
-                }
-                levelGroups.get(group.level).push(group);
-            });
-
-            const levelSpacing = 200;
-            const nodeSpacing = 100;
-
-            levelGroups.forEach((levelItems, level) => {
-                levelItems.forEach((group, index) => {
-                    const totalItems = levelItems.length;
-                    const startY = (-(totalItems - 1) * nodeSpacing) / 2;
-                    
-                    group.x = level * levelSpacing + 100;
-                    group.y = startY + index * nodeSpacing + 300;
-                });
-            });
-
-            return groups;
-        }
-
-        // Create edges between groups
-        function createEdges(groups) {
-            const edges = [];
-            groups.forEach(group => {
-                Array.from(group.parents).forEach(parentId => {
-                    const parentGroup = groups.find(g => g.jobs.some(j => j.job_id.toString() === parentId));
-                    if (parentGroup && parentGroup.id !== group.id) {
-                        edges.push({ from: parentGroup, to: group });
-                    }
-                });
-            });
-            return edges;
         }
 
         // Smart range display for job IDs
@@ -848,164 +858,305 @@
             }
         }
 
-        // Get group status
+        // Get group status - returns MIXED if there are different statuses
         function getGroupStatus(jobs) {
-            if (jobs.every(job => job.status === "COMPLETED")) return "COMPLETED";
-            if (jobs.some(job => job.status === "FAILED")) return "FAILED";
-            if (jobs.some(job => job.status === "RUNNING")) return "RUNNING";
-            return "PENDING";
+            const statuses = [...new Set(jobs.map(job => job.status))];
+            if (statuses.length === 1) {
+                return statuses[0];
+            }
+            return "MIXED";
         }
 
-        // Render the graph
-        function renderGraph() {
-            if (jobs.length === 0) return;
+        // Get status breakdown for tooltips and modals
+        function getStatusBreakdown(jobs) {
+            const counts = {
+                COMPLETED: 0,
+                RUNNING: 0,
+                FAILED: 0,
+                PENDING: 0
+            };
             
-            const svg = document.getElementById('graph');
-            svg.innerHTML = '';
-
-            currentGroups = calculatePositions(createGroups());
-            const edges = createEdges(currentGroups);
-
-            // Create main group with transform
-            const mainGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
-            mainGroup.setAttribute('transform', `translate(${panX}, ${panY}) scale(${zoom})`);
-
-            // Add arrow marker
-            const defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
-            const marker = document.createElementNS('http://www.w3.org/2000/svg', 'marker');
-            marker.setAttribute('id', 'arrowhead');
-            marker.setAttribute('markerWidth', '10');
-            marker.setAttribute('markerHeight', '7');
-            marker.setAttribute('refX', '9');
-            marker.setAttribute('refY', '3.5');
-            marker.setAttribute('orient', 'auto');
-            
-            const polygon = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
-            polygon.setAttribute('points', '0 0, 10 3.5, 0 7');
-            polygon.setAttribute('fill', '#6b7280');
-            
-            marker.appendChild(polygon);
-            defs.appendChild(marker);
-            svg.appendChild(defs);
-
-            // Draw edges
-            edges.forEach(edge => {
-                const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-                line.setAttribute('x1', edge.from.x + 80);
-                line.setAttribute('y1', edge.from.y + 30);
-                line.setAttribute('x2', edge.to.x);
-                line.setAttribute('y2', edge.to.y + 30);
-                line.setAttribute('stroke', '#6b7280');
-                line.setAttribute('stroke-width', '2');
-                line.setAttribute('marker-end', 'url(#arrowhead)');
-                mainGroup.appendChild(line);
+            jobs.forEach(job => {
+                counts[job.status] = (counts[job.status] || 0) + 1;
             });
+            
+            const parts = [];
+            if (counts.COMPLETED > 0) parts.push(`${counts.COMPLETED} COMPLETED`);
+            if (counts.RUNNING > 0) parts.push(`${counts.RUNNING} RUNNING`);
+            if (counts.FAILED > 0) parts.push(`${counts.FAILED} FAILED`);
+            if (counts.PENDING > 0) parts.push(`${counts.PENDING} PENDING`);
+            
+            return parts.join(', ');
+        }
 
-            // Draw groups
-            currentGroups.forEach((group, groupIndex) => {
+        // Tooltip functions
+        function showTooltip(event, group) {
+            const tooltip = document.getElementById('tooltip');
+            const groupStatus = getGroupStatus(group.jobs);
+            const breakdown = getStatusBreakdown(group.jobs);
+            const jobIds = group.jobs.map(j => j.job_id);
+            const displayText = smartRangeDisplay(jobIds);
+            
+            tooltip.innerHTML = `
+                <div class="tooltip-header">Group #${displayText}</div>
+                <div class="tooltip-group">${group.jobs[0].group_name}</div>
+                <span class="tooltip-status ${getStatusClass(groupStatus)}">${groupStatus}</span>
+                ${groupStatus === "MIXED" ? `<div class="tooltip-breakdown">${breakdown}</div>` : ''}
+                <div class="tooltip-count">${group.jobs.length} job${group.jobs.length > 1 ? 's' : ''} total</div>
+            `;
+            
+            // Position tooltip
+            const rect = event.target.getBoundingClientRect();
+            const tooltipRect = tooltip.getBoundingClientRect();
+            
+            let left = event.clientX + 10;
+            let top = event.clientY - 10;
+            
+            // Adjust if tooltip would go off screen
+            if (left + 250 > window.innerWidth) {
+                left = event.clientX - 260;
+            }
+            if (top + tooltipRect.height > window.innerHeight) {
+                top = event.clientY - tooltipRect.height - 10;
+            }
+            
+            tooltip.style.left = left + 'px';
+            tooltip.style.top = top + 'px';
+            tooltip.classList.add('show');
+        }
+
+        function hideTooltip() {
+            document.getElementById('tooltip').classList.remove('show');
+        }
+
+        // Render the graph using Cytoscape.js (when libraries are loaded)
+        function renderGraph() {
+            if (jobs.length === 0 || !librariesLoaded) return;
+            
+            const groups = createGroups();
+            
+            // Prepare nodes and edges for Cytoscape
+            const elements = [];
+            
+            // Add nodes
+            groups.forEach(group => {
                 const groupStatus = getGroupStatus(group.jobs);
                 const jobIds = group.jobs.map(j => j.job_id);
                 const displayText = smartRangeDisplay(jobIds);
                 const groupName = group.jobs[0].group_name || "root";
+                
+                elements.push({
+                    data: {
+                        id: group.id,
+                        label: `#${displayText}\n${groupName}\n${groupStatus}`,
+                        status: groupStatus,
+                        jobs: group.jobs,
+                        displayText: displayText,
+                        groupName: groupName
+                    }
+                });
+            });
+            
+            // Add edges
+            groups.forEach(group => {
+                Array.from(group.parents).forEach(parentId => {
+                    const parentGroup = groups.find(g => g.jobs.some(j => j.job_id.toString() === parentId));
+                    if (parentGroup && parentGroup.id !== group.id) {
+                        elements.push({
+                            data: {
+                                id: `${parentGroup.id}-${group.id}`,
+                                source: parentGroup.id,
+                                target: group.id
+                            }
+                        });
+                    }
+                });
+            });
 
-                // Group rectangle
-                const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-                rect.setAttribute('x', group.x);
-                rect.setAttribute('y', group.y);
-                rect.setAttribute('width', '160');
-                rect.setAttribute('height', '60');
-                rect.setAttribute('rx', '8');
-                rect.setAttribute('fill', getStatusColor(groupStatus));
-                rect.setAttribute('fill-opacity', '0.1');
-                rect.setAttribute('stroke', getStatusColor(groupStatus));
-                rect.setAttribute('stroke-width', '2');
-                rect.style.cursor = 'pointer';
-                rect.setAttribute('data-group-index', groupIndex);
+            // Initialize or update Cytoscape
+            if (cy) {
+                cy.destroy();
+            }
+
+            try {
+                cy = cytoscape({
+                    container: document.getElementById('cy'),
+                    elements: elements,
+                    style: [
+                        {
+                            selector: 'node',
+                            style: {
+                                'background-color': function(ele) {
+                                    return getStatusColor(ele.data('status'));
+                                },
+                                'background-opacity': 0.1,
+                                'border-color': function(ele) {
+                                    return getStatusColor(ele.data('status'));
+                                },
+                                'border-width': 2,
+                                'border-opacity': 0.8,
+                                'label': 'data(label)',
+                                'text-valign': 'center',
+                                'text-halign': 'center',
+                                'font-size': '12px',
+                                'font-weight': 'bold',
+                                'color': '#111827',
+                                'text-wrap': 'wrap',
+                                'text-max-width': '140px',
+                                'width': '160px',
+                                'height': '80px',
+                                'shape': 'round-rectangle',
+                                'cursor': 'pointer'
+                            }
+                        },
+                        {
+                            selector: 'node:hover',
+                            style: {
+                                'border-width': 3,
+                                'border-opacity': 1,
+                                'background-opacity': 0.2
+                            }
+                        },
+                        {
+                            selector: 'edge',
+                            style: {
+                                'width': 2,
+                                'line-color': '#6b7280',
+                                'target-arrow-color': '#6b7280',
+                                'target-arrow-shape': 'triangle',
+                                'curve-style': 'bezier',
+                                'control-point-step-size': 40,
+                                'arrow-scale': 1.2
+                            }
+                        },
+                        {
+                            selector: 'edge:hover',
+                            style: {
+                                'width': 3,
+                                'line-color': '#374151',
+                                'target-arrow-color': '#374151'
+                            }
+                        }
+                    ],
+                    layout: {
+                        name: 'dagre',
+                        rankDir: 'LR',
+                        spacingFactor: 1.5,
+                        nodeSep: 50,
+                        rankSep: 100,
+                        edgeSep: 10
+                    },
+                    userZoomingEnabled: true,
+                    userPanningEnabled: true,
+                    boxSelectionEnabled: false,
+                    selectionType: 'single',
+                    wheelSensitivity: 0.2
+                });
 
                 // Add event listeners
-                rect.addEventListener('mouseenter', (e) => showTooltip(e, group.jobs[0]));
-                rect.addEventListener('mouseleave', hideTooltip);
-                rect.addEventListener('click', (e) => {
-                    e.stopPropagation();
+                cy.on('tap', 'node', function(evt) {
+                    const node = evt.target;
+                    const group = {
+                        jobs: node.data('jobs'),
+                        displayText: node.data('displayText'),
+                        groupName: node.data('groupName')
+                    };
                     showGroupDetails(group);
                 });
 
-                // Job IDs text
-                const text1 = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-                text1.setAttribute('x', group.x + 80);
-                text1.setAttribute('y', group.y + 20);
-                text1.setAttribute('text-anchor', 'middle');
-                text1.setAttribute('font-size', '14');
-                text1.setAttribute('font-weight', 'bold');
-                text1.setAttribute('fill', '#111827');
-                text1.textContent = `#${displayText}`;
-                text1.style.pointerEvents = 'none';
+                // Add hover event listeners for tooltips
+                cy.on('mouseover', 'node', function(evt) {
+                    const node = evt.target;
+                    const group = {
+                        jobs: node.data('jobs'),
+                        displayText: node.data('displayText'),
+                        groupName: node.data('groupName')
+                    };
+                    showTooltip(evt.originalEvent, group);
+                });
 
-                // Group name text
-                const text2 = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-                text2.setAttribute('x', group.x + 80);
-                text2.setAttribute('y', group.y + 35);
-                text2.setAttribute('text-anchor', 'middle');
-                text2.setAttribute('font-size', '12');
-                text2.setAttribute('fill', '#6b7280');
-                text2.textContent = groupName;
-                text2.style.pointerEvents = 'none';
+                cy.on('mouseout', 'node', function(evt) {
+                    hideTooltip();
+                });
 
-                // Status text
-                const text3 = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-                text3.setAttribute('x', group.x + 80);
-                text3.setAttribute('y', group.y + 50);
-                text3.setAttribute('text-anchor', 'middle');
-                text3.setAttribute('font-size', '12');
-                text3.setAttribute('font-weight', '500');
-                text3.setAttribute('fill', getStatusColor(groupStatus));
-                text3.textContent = groupStatus;
-                text3.style.pointerEvents = 'none';
+                // Hide tooltip when mouse moves over the graph container
+                cy.on('mousemove', function(evt) {
+                    if (evt.target === cy) {
+                        hideTooltip();
+                    }
+                });
 
-                mainGroup.appendChild(rect);
-                mainGroup.appendChild(text1);
-                mainGroup.appendChild(text2);
-                mainGroup.appendChild(text3);
-            });
-
-            svg.appendChild(mainGroup);
+                // Fit the graph to the container
+                cy.fit();
+                
+                hideFallback();
+            } catch (error) {
+                console.error('Error initializing Cytoscape:', error);
+                renderSimpleGraph();
+            }
         }
 
-        // Tooltip functions
-        function showTooltip(event, job) {
-            const tooltip = document.getElementById('tooltip');
-            const rect = event.target.getBoundingClientRect();
-            
-            tooltip.innerHTML = `
-                <div class="tooltip-title">Job #${job.job_id}</div>
-                <div class="tooltip-command">${job.command}</div>
-                <span class="tooltip-status ${getStatusClass(job.status)}">${job.status}</span>
+        // Fallback: Simple SVG graph (if Cytoscape fails to load)
+        function renderSimpleGraph() {
+            hideFallback();
+            const cyContainer = document.getElementById('cy');
+            cyContainer.innerHTML = `
+                <div style="display: flex; align-items: center; justify-content: center; height: 100%; flex-direction: column; color: #6b7280;">
+                    <div style="font-size: 18px; margin-bottom: 8px;">📊 Simple Graph View</div>
+                    <div style="font-size: 14px; margin-bottom: 16px;">External libraries couldn't load, showing basic view</div>
+                    <div style="display: grid; gap: 12px; max-width: 600px;">
+                        ${jobs.map(job => `
+                            <div style="border: 1px solid #e5e7eb; border-radius: 8px; padding: 12px; background: white;">
+                                <div style="font-weight: bold; margin-bottom: 4px;">#${job.job_id} - ${job.status}</div>
+                                <div style="font-size: 12px; color: #6b7280;">${job.group_name}</div>
+                                <div style="font-size: 11px; color: #9ca3af; margin-top: 4px;">${job.command}</div>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
             `;
-            
-            tooltip.style.left = (rect.right + 10) + 'px';
-            tooltip.style.top = rect.top + 'px';
-            tooltip.classList.remove('hidden');
         }
 
-        function hideTooltip() {
-            document.getElementById('tooltip').classList.add('hidden');
+        // Graph control functions
+        function fitGraph() {
+            if (cy) {
+                cy.fit();
+            }
+        }
+
+        function zoomIn() {
+            if (cy) {
+                cy.zoom(cy.zoom() * 1.2);
+            }
+        }
+
+        function zoomOut() {
+            if (cy) {
+                cy.zoom(cy.zoom() * 0.8);
+            }
+        }
+
+        function resetView() {
+            if (cy) {
+                cy.fit();
+                cy.center();
+            }
         }
 
         // Enhanced modal for group details
         function showGroupDetails(group) {
-            const jobIds = group.jobs.map(j => j.job_id);
-            const displayText = smartRangeDisplay(jobIds);
             const groupStatus = getGroupStatus(group.jobs);
             
             // Update modal header
-            document.getElementById('modal-title').textContent = `Group: ${displayText}`;
+            document.getElementById('modal-title').textContent = `Group: ${group.displayText}`;
             
             const completedJobs = group.jobs.filter(j => j.status === "COMPLETED").length;
             const runningJobs = group.jobs.filter(j => j.status === "RUNNING").length;
             const failedJobs = group.jobs.filter(j => j.status === "FAILED").length;
+            const pendingJobs = group.jobs.filter(j => j.status === "PENDING").length;
             
             document.getElementById('modal-subtitle').innerHTML = `
-                <span>${group.jobs[0].group_name}</span>
+                <span>${group.groupName}</span>
                 <span>•</span>
                 <span>${group.jobs.length} jobs</span>
                 <span>•</span>
@@ -1024,6 +1175,10 @@
                 <div class="stat-item">
                     <span class="stat-value">${failedJobs}</span>
                     <span>failed</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-value">${pendingJobs}</span>
+                    <span>pending</span>
                 </div>
             `;
             
@@ -1126,61 +1281,6 @@
             document.getElementById('modal').classList.remove('show');
         }
 
-        // Zoom and pan controls
-        function zoomIn() {
-            zoom = Math.min(3, zoom * 1.2);
-            updateZoom();
-        }
-
-        function zoomOut() {
-            zoom = Math.max(0.1, zoom * 0.8);
-            updateZoom();
-        }
-
-        function resetView() {
-            zoom = 1;
-            panX = 0;
-            panY = 0;
-            updateZoom();
-        }
-
-        function updateZoom() {
-            document.getElementById('zoom-level').textContent = Math.round(zoom * 100) + '%';
-            renderGraph();
-        }
-
-        // Mouse events for panning
-        document.getElementById('graph').addEventListener('mousedown', (e) => {
-            if (e.target.tagName === 'svg') {
-                isDragging = true;
-                lastMouseX = e.clientX;
-                lastMouseY = e.clientY;
-                e.target.style.cursor = 'grabbing';
-            }
-        });
-
-        document.addEventListener('mousemove', (e) => {
-            if (isDragging) {
-                const deltaX = e.clientX - lastMouseX;
-                const deltaY = e.clientY - lastMouseY;
-                
-                panX += deltaX;
-                panY += deltaY;
-                
-                lastMouseX = e.clientX;
-                lastMouseY = e.clientY;
-                
-                renderGraph();
-            }
-        });
-
-        document.addEventListener('mouseup', () => {
-            if (isDragging) {
-                isDragging = false;
-                document.getElementById('graph').style.cursor = 'grab';
-            }
-        });
-
         // Close modal when clicking outside
         document.getElementById('modal').addEventListener('click', (e) => {
             if (e.target.id === 'modal') {
@@ -1188,23 +1288,47 @@
             }
         });
 
-        // Prevent context menu on right click
-        document.getElementById('graph').addEventListener('contextmenu', (e) => {
-            e.preventDefault();
+        // Hide tooltip when clicking anywhere
+        document.addEventListener('click', () => {
+            hideTooltip();
         });
 
         // Initialize the application
         async function init() {
             try {
+                // Try to load external libraries
+                try {
+                    await loadLibraries();
+                    console.log('External libraries loaded successfully');
+                } catch (error) {
+                    console.warn('Failed to load external libraries, using fallback:', error);
+                    librariesLoaded = false;
+                }
+
+                // Load job data
                 jobs = await getJobs();
-                renderGraph();
                 
-                // Optional: Set up auto-refresh every 30 seconds
-                // setInterval(refreshJobs, 30000);
+                // Render graph
+                if (librariesLoaded) {
+                    renderGraph();
+                } else {
+                    renderSimpleGraph();
+                }
+                
+                console.log('Application initialized successfully');
                 
             } catch (error) {
                 console.error('Failed to initialize:', error);
                 showError('Failed to initialize application');
+                hideFallback();
+                
+                // Show basic fallback
+                const cyContainer = document.getElementById('cy');
+                cyContainer.innerHTML = `
+                    <div style="display: flex; align-items: center; justify-content: center; height: 100%; color: #dc2626;">
+                        <div>Failed to initialize application. Please refresh the page.</div>
+                    </div>
+                `;
             }
         }
 
