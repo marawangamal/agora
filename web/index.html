@@ -1022,124 +1022,118 @@
 
     // Dummy job data for development
     const DUMMY_JOBS = [
-    {
-        job_id: 789012,
-        command: "jrun analyze --input dataset.csv --output results/",
-        group_name: "data_prep",
-        depends_on: [],
-        status: "COMPLETED",
-        preamble: "#!/bin/bash\n#SBATCH --job-name=analyze\n#SBATCH --time=01:00:00\n#SBATCH --mem=4G",
-        start_time: "2024-01-15 09:00:00",
-        end_time: "2024-01-15 09:45:00"
-    },
-    {
-        job_id: 123456,
-        command: "jrun viz --type scatter --input results/analysis.json",
-        group_name: "visualization",
-        depends_on: ["789012"],
-        status: "RUNNING",
-        loop_id: "viz_loop_1",
-        preamble: "#!/bin/bash\n#SBATCH --job-name=viz-scatter\n#SBATCH --gres=gpu:1\n#SBATCH --time=02:00:00",
-        start_time: "2024-01-15 10:00:00",
-        stats: {
-            gpu_memory_used_mb: 8192,
-            gpu_memory_total_mb: 12288,
-            gpu_count: 1,
-            cpu_usage: 85
+        {
+            job_id: 789012,
+            command: "jrun analyze --input dataset.csv --output results/",
+            group_name: "data_prep",
+            depends_on: [],
+            status: "COMPLETED",
+            preamble: "#!/bin/bash\n#SBATCH --job-name=analyze\n#SBATCH --time=01:00:00\n#SBATCH --mem=4G",
+            start_time: "2024-01-15 09:00:00",
+            end_time: "2024-01-15 09:45:00"
+        },
+        {
+            job_id: 123456,
+            command: "jrun viz --type scatter --input results/analysis.json",
+            group_name: "visualization",
+            depends_on: ["789012"],
+            status: "RUNNING",
+            preamble: "#!/bin/bash\n#SBATCH --job-name=viz-scatter\n#SBATCH --gres=gpu:1\n#SBATCH --time=02:00:00",
+            start_time: "2024-01-15 10:00:00",
+            stats: {
+                gpu_memory_used_mb: 8192,
+                gpu_memory_total_mb: 12288,
+                gpu_count: 1,
+                cpu_usage: 85
+            }
+        },
+        {
+            job_id: 123457,
+            command: "jrun viz --type histogram --input results/analysis.json",
+            group_name: "visualization",
+            depends_on: ["789012"],
+            status: "COMPLETED",
+            preamble: "#!/bin/bash\n#SBATCH --job-name=viz-histogram\n#SBATCH --gres=gpu:1",
+            start_time: "2024-01-15 10:00:00",
+            end_time: "2024-01-15 10:30:00"
+        },
+        {
+            job_id: 123458,
+            command: "jrun viz --type boxplot --input results/analysis.json",
+            group_name: "visualization",
+            depends_on: ["789012"],
+            status: "PENDING",
+            preamble: "#!/bin/bash\n#SBATCH --job-name=viz-boxplot\n#SBATCH --gres=gpu:1"
+        },
+        {
+            job_id: 345678,
+            command: "jrun preprocess --input data.csv --normalize --scale",
+            group_name: "preprocessing",
+            depends_on: ["789012"],
+            status: "COMPLETED",
+            preamble: "#!/bin/bash\n#SBATCH --job-name=preprocess\n#SBATCH --time=02:00:00\n#SBATCH --mem=8G",
+            start_time: "2024-01-15 09:50:00",
+            end_time: "2024-01-15 11:20:00"
+        },
+        {
+            job_id: 901234,
+            command: "jrun model_training --model linear --epochs 100",
+            group_name: "ml_pipeline",
+            depends_on: ["345678"],
+            status: "RUNNING",
+            preamble: "#!/bin/bash\n#SBATCH --job-name=train-linear\n#SBATCH --gres=gpu:2\n#SBATCH --time=04:00:00",
+            start_time: "2024-01-15 11:30:00",
+            stats: {
+                gpu_memory_used_mb: 20480,
+                gpu_memory_total_mb: 24576,
+                gpu_count: 2,
+                cpu_usage: 92
+            }
+        },
+        {
+            job_id: 901235,
+            command: "jrun model_training --model random_forest --trees 500",
+            group_name: "ml_pipeline",
+            depends_on: ["345678"],
+            status: "PENDING",
+            preamble: "#!/bin/bash\n#SBATCH --job-name=train-rf\n#SBATCH --time=04:00:00\n#SBATCH --mem=16G"
+        },
+        {
+            job_id: 901236,
+            command: "jrun model_training --model neural_net --layers 5",
+            group_name: "ml_pipeline",
+            depends_on: ["345678"],
+            status: "FAILED",
+            preamble: "#!/bin/bash\n#SBATCH --job-name=train-nn\n#SBATCH --gres=gpu:4",
+            start_time: "2024-01-15 11:30:00",
+            end_time: "2024-01-15 11:45:00",
+            error_message: "CUDA out of memory error"
+        },
+        {
+            job_id: 567890,
+            command: "jrun validation --cross-validate --folds 5",
+            group_name: "validation",
+            depends_on: ["123456", "123457", "345678"],
+            status: "PENDING",
+            preamble: "#!/bin/bash\n#SBATCH --job-name=validation-cv\n#SBATCH --time=01:30:00"
+        },
+        {
+            job_id: 567891,
+            command: "jrun validation --holdout --split 0.2",
+            group_name: "validation",
+            depends_on: ["123456", "123457", "345678"],
+            status: "PENDING",
+            preamble: "#!/bin/bash\n#SBATCH --job-name=validation-holdout\n#SBATCH --time=01:00:00"
+        },
+        {
+            job_id: 111222,
+            command: "jrun report --format pdf --template executive",
+            group_name: "reporting",
+            depends_on: ["567890", "567891"],
+            status: "PENDING",
+            preamble: "#!/bin/bash\n#SBATCH --job-name=report-pdf\n#SBATCH --time=00:30:00"
         }
-    },
-    {
-        job_id: 123457,
-        command: "jrun viz --type histogram --input results/analysis.json",
-        group_name: "visualization",
-        depends_on: ["789012"],
-        status: "COMPLETED",
-        loop_id: "viz_loop_1",
-        preamble: "#!/bin/bash\n#SBATCH --job-name=viz-histogram\n#SBATCH --gres=gpu:1",
-        start_time: "2024-01-15 10:00:00",
-        end_time: "2024-01-15 10:30:00"
-    },
-    {
-        job_id: 123458,
-        command: "jrun viz --type boxplot --input results/analysis.json",
-        group_name: "visualization",
-        depends_on: ["789012"],
-        status: "PENDING",
-        loop_id: "viz_loop_1",
-        preamble: "#!/bin/bash\n#SBATCH --job-name=viz-boxplot\n#SBATCH --gres=gpu:1"
-    },
-    {
-        job_id: 345678,
-        command: "jrun preprocess --input data.csv --normalize --scale",
-        group_name: "preprocessing",
-        depends_on: ["789012"],
-        status: "COMPLETED",
-        preamble: "#!/bin/bash\n#SBATCH --job-name=preprocess\n#SBATCH --time=02:00:00\n#SBATCH --mem=8G",
-        start_time: "2024-01-15 09:50:00",
-        end_time: "2024-01-15 11:20:00"
-    },
-    {
-        job_id: 901234,
-        command: "jrun model_training --model linear --epochs 100",
-        group_name: "ml_pipeline",
-        depends_on: ["345678"],
-        status: "RUNNING",
-        loop_id: "training_loop_1",
-        preamble: "#!/bin/bash\n#SBATCH --job-name=train-linear\n#SBATCH --gres=gpu:2\n#SBATCH --time=04:00:00",
-        start_time: "2024-01-15 11:30:00",
-        stats: {
-            gpu_memory_used_mb: 20480,
-            gpu_memory_total_mb: 24576,
-            gpu_count: 2,
-            cpu_usage: 92
-        }
-    },
-    {
-        job_id: 901235,
-        command: "jrun model_training --model random_forest --trees 500",
-        group_name: "ml_pipeline",
-        depends_on: ["345678"],
-        status: "PENDING",
-        loop_id: "training_loop_1",
-        preamble: "#!/bin/bash\n#SBATCH --job-name=train-rf\n#SBATCH --time=04:00:00\n#SBATCH --mem=16G"
-    },
-    {
-        job_id: 901236,
-        command: "jrun model_training --model neural_net --layers 5",
-        group_name: "ml_pipeline",
-        depends_on: ["345678"],
-        status: "FAILED",
-        loop_id: "training_loop_1",
-        preamble: "#!/bin/bash\n#SBATCH --job-name=train-nn\n#SBATCH --gres=gpu:4",
-        start_time: "2024-01-15 11:30:00",
-        end_time: "2024-01-15 11:45:00",
-        error_message: "CUDA out of memory error"
-    },
-    {
-        job_id: 567890,
-        command: "jrun validation --cross-validate --folds 5",
-        group_name: "validation",
-        depends_on: ["123456", "123457", "345678"],
-        status: "PENDING",
-        preamble: "#!/bin/bash\n#SBATCH --job-name=validation-cv\n#SBATCH --time=01:30:00"
-    },
-    {
-        job_id: 567891,
-        command: "jrun validation --holdout --split 0.2",
-        group_name: "validation",
-        depends_on: ["123456", "123457", "345678"],
-        status: "PENDING",
-        preamble: "#!/bin/bash\n#SBATCH --job-name=validation-holdout\n#SBATCH --time=01:00:00"
-    },
-    {
-        job_id: 111222,
-        command: "jrun report --format pdf --template executive",
-        group_name: "reporting",
-        depends_on: ["567890", "567891"],
-        status: "PENDING",
-        preamble: "#!/bin/bash\n#SBATCH --job-name=report-pdf\n#SBATCH --time=00:30:00"
-    }
-];
+    ];
 
     // Global state
     let jobs = [];
@@ -1504,7 +1498,7 @@
         return Math.round((finishedJobs / jobs.length) * 100);
     }
 
-    // Create node groups based on dependencies AND loop_id
+    // Create node groups based on dependencies
     function createGroups() {
         const parentToChildMap = new Map();
         
@@ -1519,23 +1513,17 @@
             });
         });
 
-        // Group jobs by loop_id first, then by dependency signature
+        // Group jobs by dependency signature
         const groupMap = new Map();
-        
         jobs.forEach(job => {
             const jobId = job.job_id.toString();
             const parents = new Set(job.depends_on);
             const children = parentToChildMap.get(jobId) || new Set();
-            const loopId = job.loop_id || null;
-            if (loopId) {
-                // If no loop_id, treat as a single group
-                console.log(`Job ${jobId} has loop_id: ${loopId}`);
-            }
+            const loopId = job.loop_id
 
-            // Create a signature that includes loop_id
             const parentsKey = Array.from(parents).sort().join(",");
             const childrenKey = Array.from(children).sort().join(",");
-            const signature = loopId ? loopId : `${parentsKey}|${childrenKey}` 
+            const signature =  loopId ? loopId : `${parentsKey}|${childrenKey}`;
 
             if (!groupMap.has(signature)) {
                 groupMap.set(signature, []);
@@ -1550,7 +1538,6 @@
         groupMap.forEach(groupJobs => {
             const progress = calculateProgress(groupJobs);
             const nodeColor = getNodeColor(groupJobs);
-            const hasLoopId = groupJobs[0].loop_id;
             
             groups.push({
                 id: `group_${groupIndex++}`,
@@ -1558,57 +1545,73 @@
                 parents: new Set(groupJobs[0].depends_on),
                 children: parentToChildMap.get(groupJobs[0].job_id.toString()) || new Set(),
                 progress: progress,
-                nodeColor: nodeColor,
-                loopId: hasLoopId || null
+                nodeColor: nodeColor
             });
         });
 
         return groups;
     }
 
-    // Smart range display for job IDs with loop information
-    function smartRangeDisplay(jobIds, loopId = null) {
+    // Smart range display for job IDs
+    function smartRangeDisplay(jobIds) {
         const sorted = jobIds.sort((a, b) => a - b);
         
-        let displayText;
         if (sorted.length === 1) {
-            displayText = sorted[0].toString();
+            return sorted[0].toString();
         } else if (sorted.length <= 3) {
-            displayText = sorted.join(", ");
+            return sorted.join(", ");
         } else {
             const isContinuous = sorted.every((id, i) => i === 0 || id === sorted[i - 1] + 1);
             
             if (isContinuous) {
-                displayText = `${sorted[0]}-${sorted[sorted.length - 1]}`;
+                return `${sorted[0]}-${sorted[sorted.length - 1]}`;
             } else {
-                displayText = `${sorted[0]}...${sorted[sorted.length - 1]}`;
+                return `${sorted[0]}...${sorted[sorted.length - 1]}`;
             }
         }
-        
-        // Add loop indicator if present
-        if (loopId) {
-            displayText += ` (${loopId})`;
+    }
+
+    // Get group status - returns MIXED if there are different statuses
+    function getGroupStatus(jobs) {
+        const statuses = [...new Set(jobs.map(job => job.status))];
+        if (statuses.length === 1) {
+            return statuses[0];
         }
+        return "MIXED";
+    }
+
+    // Get status breakdown for simplified tooltips
+    function getStatusBreakdown(jobs) {
+        const counts = {
+            COMPLETED: 0,
+            RUNNING: 0,
+            FAILED: 0,
+            PENDING: 0
+        };
         
-        return displayText;
+        jobs.forEach(job => {
+            counts[job.status] = (counts[job.status] || 0) + 1;
+        });
+        
+        const parts = [];
+        if (counts.COMPLETED > 0) parts.push(`${counts.COMPLETED} completed`);
+        if (counts.RUNNING > 0) parts.push(`${counts.RUNNING} running`);
+        if (counts.FAILED > 0) parts.push(`${counts.FAILED} failed`);
+        if (counts.PENDING > 0) parts.push(`${counts.PENDING} pending`);
+        
+        return parts.join(' • ');
     }
 
     // Simplified tooltip function
     function showTooltip(event, group) {
         const tooltip = document.getElementById('tooltip');
         const jobIds = group.jobs.map(j => j.job_id);
-        const displayText = smartRangeDisplay(jobIds, group.loopId);
+        const displayText = smartRangeDisplay(jobIds);
         const breakdown = getStatusBreakdown(group.jobs);
-        
-        let loopInfo = '';
-        if (group.loopId) {
-            loopInfo = `<div style="font-size: 10px; color: var(--text-tertiary); margin-top: 2px;">Loop: ${group.loopId}</div>`;
-        }
         
         tooltip.innerHTML = `
             <div class="tooltip-header">Group #${displayText}</div>
             <div class="tooltip-breakdown">${breakdown}</div>
-            ${loopInfo}
         `;
         
         // Position tooltip
@@ -1657,7 +1660,7 @@
         // Add nodes
         filteredGroups.forEach(group => {
             const jobIds = group.jobs.map(j => j.job_id);
-            const displayText = smartRangeDisplay(jobIds, group.loopId);
+            const displayText = smartRangeDisplay(jobIds);
             const groupName = group.jobs[0].group_name || "root";
             const progress = group.progress;
             const nodeColor = group.nodeColor;
@@ -1679,8 +1682,7 @@
                     progress: progress,
                     nodeColor: nodeColor,
                     backgroundColor: backgroundColor,
-                    borderColor: borderColor,
-                    loopId: group.loopId
+                    borderColor: borderColor
                 }
             });
         });
@@ -1798,8 +1800,7 @@
                 const group = {
                     jobs: node.data('jobs'),
                     displayText: node.data('displayText'),
-                    groupName: node.data('groupName'),
-                    loopId: node.data('loopId')
+                    groupName: node.data('groupName')
                 };
                 showTooltip(evt.originalEvent, group);
             });
@@ -1848,7 +1849,7 @@
                 <div style="display: grid; gap: 12px; max-width: 600px; max-height: 400px; overflow-y: auto;">
                     ${filteredGroups.map(group => {
                         const jobIds = group.jobs.map(j => j.job_id);
-                        const displayText = smartRangeDisplay(jobIds, group.loopId);
+                        const displayText = smartRangeDisplay(jobIds);
                         const groupName = group.jobs[0].group_name;
                         const progress = group.progress;
                         return `
