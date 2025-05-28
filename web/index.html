@@ -1316,7 +1316,7 @@
             }
             const data = await response.json();
             console.log('Fetched jobs from API:', data);
-            // return data;
+            return data;
 
             // For development, simulate API delay and return dummy data
             await new Promise(resolve => setTimeout(resolve, 500));
