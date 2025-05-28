@@ -14,20 +14,7 @@ def create_app(default_db: str, web_folder: Path) -> Flask:
     def api_jobs():
         db_path = request.args.get("db", default_db) or default_db
         viewer = JobViewer(db_path)
-        jobs = viewer.get_jobs(filters=None, ignore_status=False)
-
-        # Build plain dicts
-        jobs_data = [
-            {
-                "job_id": job.job_id,
-                "status": job.status,
-                "command": job.command,
-                "group_name": job.group_name,
-                "depends_on": job.depends_on,
-                "preamble": job.preamble,
-            }
-            for job in jobs
-        ]
+        jobs_data = viewer.get_jobs(filters=None, ignore_status=False)
 
         # If they asked for JSON mode, wrap with stats/count
         if request.args.get("format") == "json":

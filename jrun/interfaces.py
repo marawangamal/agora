@@ -1,5 +1,5 @@
 from dataclasses import asdict, dataclass, field
-from typing import Any, Dict, List, Literal, Union
+from typing import Any, Dict, List, Literal, Optional, Union
 import os.path as osp
 import appdirs
 from pathlib import Path
@@ -25,6 +25,7 @@ class JobSpec:
     status: str = "UNKNOWN"
     inactive_deps: List[str] = field(default_factory=list)
     logs_dir: str = get_default_logs_dir()
+    loop_id: Optional[str] = None
 
     @property
     def preamble_sbatch(self) -> List[str]:

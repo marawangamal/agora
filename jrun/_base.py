@@ -41,6 +41,7 @@ class JobDB:
             preamble TEXT NOT NULL,
             group_name TEXT NOT NULL,
             depends_on TEXT,
+            loop_id TEXT,
             created_at TEXT NOT NULL,
             updated_at TEXT NOT NULL
         )
@@ -168,15 +169,26 @@ class JobDB:
     def insert_record(self, rec: JobSpec) -> None:
         """Insert a new job row (fails if job_id already exists)."""
         now = datetime.datetime.utcnow().isoformat(timespec="seconds")
+
+        # job_id: int
+        # command: str
+        # preamble: str
+        # group_name: str
+        # depends_on: List[str]
+        # status: str = "UNKNOWN"
+        # inactive_deps: List[str] = field(default_factory=list)
+        # logs_dir: str = get_default_logs_dir()
+        # loop_id: Optional[str] = None
+
         with sqlite3.connect(self.db_path) as conn:
             cur = conn.cursor()
             cur.execute(
                 """
                 INSERT INTO jobs (
                     job_id, command, preamble, group_name,
-                    depends_on, created_at, updated_at
+                    depends_on, loop_id, created_at, updated_at
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     str(rec.job_id),
@@ -185,6 +197,7 @@ class JobDB:
                     rec.group_name,
                     json.dumps(rec.depends_on),  # store list as JSON text
                     # inverse: json.loads(rec.depends_on),
+                    rec.loop_id,
                     now,
                     now,
                 ),
@@ -243,7 +256,7 @@ class JobDB:
         cursor = conn.cursor()
 
         # Get basic job information
-        query = "SELECT job_id, command, preamble, group_name, depends_on FROM jobs"
+        query = "SELECT job_id, command, preamble, group_name, depends_on, loop_id FROM jobs"
         params = []
 
         # Remove status from filters
@@ -291,6 +304,7 @@ class JobDB:
                 preamble=row[2],
                 group_name=row[3],
                 depends_on=json.loads(row[4]),
+                loop_id=row[5],
                 status=job_statuses.get(str(row[0]), "UNKNOWN"),
             )
             for row in jobs

@@ -685,6 +685,20 @@ class TestJrunSimple(unittest.TestCase):
                 " ".join([str(j) for j in job_ids_list[:i]]),
             )
 
+        # assert first two and second two have diff loop_ids
+        for i in range(2):
+            self.assertNotEqual(
+                jobs[i].loop_id,
+                jobs[i + 2].loop_id,
+                f"Loop IDs should be different for job {i} and {i + 2}",
+            )
+        # assert first two have same loop_id
+        self.assertEqual(
+            jobs[0].loop_id,
+            jobs[1].loop_id,
+            f"Loop IDs should be the same for job {i} and {i + 1}",
+        )
+
     @patch("os.popen")
     def test_sbatch_args(self, mock_popen):
         """Test that sbatch args are passed correctly."""
