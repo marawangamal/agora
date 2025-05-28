@@ -632,11 +632,12 @@
         padding: 8px 12px;
         border-radius: 6px;
         font-size: 13px;
-        color: var(--text-secondary);
+        color: var(--text-primary);
         margin-bottom: 12px;
-        border-left: 3px solid var(--border-primary);
+        border-left: 3px solid var(--border-secondary);
         word-break: break-all;
         transition: all 0.3s ease;
+        line-height: 1.4;
     }
 
     .job-details {
@@ -820,7 +821,7 @@
             <p class="subtitle">Professional dependency visualization with advanced filtering and search capabilities</p>
             <div class="copyright">
                 <span>© 2024</span>
-                <a href="https://github.com/yourusername/slurm-viz" target="_blank">SLURM Visualizer</a>
+                <a href="https://github.com/marawangamal/jrun" target="_blank">SLURM Visualizer</a>
                 <span>•</span>
                 <span>Built with ❤️ for HPC workflows</span>
                 <span>•</span>
@@ -1021,120 +1022,241 @@
     }
 
     // Dummy job data for development
+    // const DUMMY_JOBS = [
+    //     {
+    //         job_id: 789012,
+    //         command: "jrun analyze --input dataset.csv --output results/",
+    //         group_name: "data_prep",
+    //         depends_on: [],
+    //         status: "COMPLETED",
+    //         preamble: "#!/bin/bash\n#SBATCH --job-name=analyze\n#SBATCH --time=01:00:00\n#SBATCH --mem=4G",
+    //         start_time: "2024-01-15 09:00:00",
+    //         end_time: "2024-01-15 09:45:00"
+    //     },
+    //     {
+    //         job_id: 123456,
+    //         command: "jrun viz --type scatter --input results/analysis.json",
+    //         group_name: "visualization",
+    //         depends_on: ["789012"],
+    //         status: "RUNNING",
+    //         preamble: "#!/bin/bash\n#SBATCH --job-name=viz-scatter\n#SBATCH --gres=gpu:1\n#SBATCH --time=02:00:00",
+    //         start_time: "2024-01-15 10:00:00",
+    //         stats: {
+    //             gpu_memory_used_mb: 8192,
+    //             gpu_memory_total_mb: 12288,
+    //             gpu_count: 1,
+    //             cpu_usage: 85
+    //         }
+    //     },
+    //     {
+    //         job_id: 123457,
+    //         command: "jrun viz --type histogram --input results/analysis.json",
+    //         group_name: "visualization",
+    //         depends_on: ["789012"],
+    //         status: "COMPLETED",
+    //         preamble: "#!/bin/bash\n#SBATCH --job-name=viz-histogram\n#SBATCH --gres=gpu:1",
+    //         start_time: "2024-01-15 10:00:00",
+    //         end_time: "2024-01-15 10:30:00"
+    //     },
+    //     {
+    //         job_id: 123458,
+    //         command: "jrun viz --type boxplot --input results/analysis.json",
+    //         group_name: "visualization",
+    //         depends_on: ["789012"],
+    //         status: "PENDING",
+    //         preamble: "#!/bin/bash\n#SBATCH --job-name=viz-boxplot\n#SBATCH --gres=gpu:1"
+    //     },
+    //     {
+    //         job_id: 345678,
+    //         command: "jrun preprocess --input data.csv --normalize --scale",
+    //         group_name: "preprocessing",
+    //         depends_on: ["789012"],
+    //         status: "COMPLETED",
+    //         preamble: "#!/bin/bash\n#SBATCH --job-name=preprocess\n#SBATCH --time=02:00:00\n#SBATCH --mem=8G",
+    //         start_time: "2024-01-15 09:50:00",
+    //         end_time: "2024-01-15 11:20:00"
+    //     },
+    //     {
+    //         job_id: 901234,
+    //         command: "jrun model_training --model linear --epochs 100",
+    //         group_name: "ml_pipeline",
+    //         depends_on: ["345678"],
+    //         status: "RUNNING",
+    //         preamble: "#!/bin/bash\n#SBATCH --job-name=train-linear\n#SBATCH --gres=gpu:2\n#SBATCH --time=04:00:00",
+    //         start_time: "2024-01-15 11:30:00",
+    //         stats: {
+    //             gpu_memory_used_mb: 20480,
+    //             gpu_memory_total_mb: 24576,
+    //             gpu_count: 2,
+    //             cpu_usage: 92
+    //         }
+    //     },
+    //     {
+    //         job_id: 901235,
+    //         command: "jrun model_training --model random_forest --trees 500",
+    //         group_name: "ml_pipeline",
+    //         depends_on: ["345678"],
+    //         status: "PENDING",
+    //         preamble: "#!/bin/bash\n#SBATCH --job-name=train-rf\n#SBATCH --time=04:00:00\n#SBATCH --mem=16G"
+    //     },
+    //     {
+    //         job_id: 901236,
+    //         command: "jrun model_training --model neural_net --layers 5",
+    //         group_name: "ml_pipeline",
+    //         depends_on: ["345678"],
+    //         status: "FAILED",
+    //         preamble: "#!/bin/bash\n#SBATCH --job-name=train-nn\n#SBATCH --gres=gpu:4",
+    //         start_time: "2024-01-15 11:30:00",
+    //         end_time: "2024-01-15 11:45:00",
+    //         error_message: "CUDA out of memory error"
+    //     },
+    //     {
+    //         job_id: 567890,
+    //         command: "jrun validation --cross-validate --folds 5",
+    //         group_name: "validation",
+    //         depends_on: ["123456", "123457", "345678"],
+    //         status: "PENDING",
+    //         preamble: "#!/bin/bash\n#SBATCH --job-name=validation-cv\n#SBATCH --time=01:30:00"
+    //     },
+    //     {
+    //         job_id: 567891,
+    //         command: "jrun validation --holdout --split 0.2",
+    //         group_name: "validation",
+    //         depends_on: ["123456", "123457", "345678"],
+    //         status: "PENDING",
+    //         preamble: "#!/bin/bash\n#SBATCH --job-name=validation-holdout\n#SBATCH --time=01:00:00"
+    //     },
+    //     {
+    //         job_id: 111222,
+    //         command: "jrun report --format pdf --template executive",
+    //         group_name: "reporting",
+    //         depends_on: ["567890", "567891"],
+    //         status: "PENDING",
+    //         preamble: "#!/bin/bash\n#SBATCH --job-name=report-pdf\n#SBATCH --time=00:30:00"
+    //     }
+    // ];
+
+    // Dummy job data for development
     const DUMMY_JOBS = [
         {
-            job_id: 789012,
-            command: "jrun analyze --input dataset.csv --output results/",
-            group_name: "data_prep",
+            job_id: 100001,
+            command: "train.py --lr 1e-3 --model llama",
+            group_name: "llama:sweep",
             depends_on: [],
             status: "COMPLETED",
-            preamble: "#!/bin/bash\n#SBATCH --job-name=analyze\n#SBATCH --time=01:00:00\n#SBATCH --mem=4G",
-            start_time: "2024-01-15 09:00:00",
-            end_time: "2024-01-15 09:45:00"
+            preamble: "#!/bin/bash\n#SBATCH --job-name=model-sweep\n#SBATCH --time=00:30:00\n#SBATCH --mem=2G",
+            start_time: "2024-01-15 08:00:00",
+            end_time: "2024-01-15 08:15:00"
         },
         {
-            job_id: 123456,
-            command: "jrun viz --type scatter --input results/analysis.json",
-            group_name: "visualization",
-            depends_on: ["789012"],
+            job_id: 100002,
+            command: "train.py --lr 1e-4 --model llama",
+            group_name: "llama:sweep",
+            depends_on: [],
+            status: "COMPLETED",
+            preamble: "#!/bin/bash\n#SBATCH --job-name=model-sweep\n#SBATCH --time=00:30:00\n#SBATCH --mem=2G",
+            start_time: "2024-01-15 08:00:00",
+            end_time: "2024-01-15 08:15:00"
+        },
+        {
+            job_id: 100003,
+            command: "train.py --lr 1e-5 --model llama",
+            group_name: "llama:sweep",
+            depends_on: [],
+            status: "COMPLETED",
+            preamble: "#!/bin/bash\n#SBATCH --job-name=model-sweep\n#SBATCH --time=00:30:00\n#SBATCH --mem=2G",
+            start_time: "2024-01-15 08:00:00",
+            end_time: "2024-01-15 08:15:00"
+        },
+        {
+            job_id: 100004,
+            command: "train.py --lr 1e-3 --model gpt2",
+            group_name: "gpt:sweep",
+            depends_on: [],
+            status: "COMPLETED",
+            preamble: "#!/bin/bash\n#SBATCH --job-name=model-sweep\n#SBATCH --time=00:30:00\n#SBATCH --mem=2G",
+            start_time: "2024-01-15 08:00:00",
+            end_time: "2024-01-15 08:15:00"
+        },
+        {
+            job_id: 100005,
+            command: "train.py --lr 1e-4 --model gpt2",
+            group_name: "gpt:sweep",
+            depends_on: [],
+            status: "COMPLETED",
+            preamble: "#!/bin/bash\n#SBATCH --job-name=model-sweep\n#SBATCH --time=00:30:00\n#SBATCH --mem=2G",
+            start_time: "2024-01-15 08:00:00",
+            end_time: "2024-01-15 08:15:00"
+        },
+        {
+            job_id: 100006,
+            command: "train.py --lr 1e-5 --model gpt2",
+            group_name: "gpt:sweep",
+            depends_on: [],
+            status: "COMPLETED",
+            preamble: "#!/bin/bash\n#SBATCH --job-name=model-sweep\n#SBATCH --time=00:30:00\n#SBATCH --mem=2G",
+            start_time: "2024-01-15 08:00:00",
+            end_time: "2024-01-15 08:15:00"
+        }, 
+        {
+            job_id: 200001,
+            command: "python train.py --model llama --epochs 50 --batch_size 32",
+            group_name: "llama:train_best",
+            depends_on: ["100001", "100002", "100003"],
+            status: "COMPLETED",
+            preamble: "#!/bin/bash\n#SBATCH --job-name=train-llama\n#SBATCH --gres=gpu:2\n#SBATCH --time=04:00:00\n#SBATCH --mem=32G",
+            start_time: "2024-01-15 08:30:00",
+            end_time: "2024-01-15 12:15:00"
+        },
+        {
+            job_id: 200002,
+            command: "python eval.py --group_id 100001",
+            group_name: "llama:train",
+            depends_on: ["200001"],
+            status: "COMPLETED",
+            preamble: "#!/bin/bash\n#SBATCH --job-name=train-llama\n#SBATCH --gres=gpu:2\n#SBATCH --time=04:00:00\n#SBATCH --mem=32G",
+            start_time: "2024-01-15 08:30:00",
+            end_time: "2024-01-15 12:15:00"
+        },
+        {
+            job_id: 200003,
+            command: "python train.py --model gpt --epochs 50 --batch_size 16",
+            group_name: "gpt:train_best",
+            depends_on: ["100004", "100005", "100006"],
             status: "RUNNING",
-            preamble: "#!/bin/bash\n#SBATCH --job-name=viz-scatter\n#SBATCH --gres=gpu:1\n#SBATCH --time=02:00:00",
-            start_time: "2024-01-15 10:00:00",
+            preamble: "#!/bin/bash\n#SBATCH --job-name=train-gpt\n#SBATCH --gres=gpu:4\n#SBATCH --time=06:00:00\n#SBATCH --mem=64G",
+            start_time: "2024-01-15 08:30:00",
             stats: {
-                gpu_memory_used_mb: 8192,
-                gpu_memory_total_mb: 12288,
-                gpu_count: 1,
-                cpu_usage: 85
+                gpu_memory_used_mb: 45056,
+                gpu_memory_total_mb: 65536,
+                gpu_count: 4,
+                cpu_usage: 88
             }
         },
         {
-            job_id: 123457,
-            command: "jrun viz --type histogram --input results/analysis.json",
-            group_name: "visualization",
-            depends_on: ["789012"],
-            status: "COMPLETED",
-            preamble: "#!/bin/bash\n#SBATCH --job-name=viz-histogram\n#SBATCH --gres=gpu:1",
-            start_time: "2024-01-15 10:00:00",
-            end_time: "2024-01-15 10:30:00"
-        },
-        {
-            job_id: 123458,
-            command: "jrun viz --type boxplot --input results/analysis.json",
-            group_name: "visualization",
-            depends_on: ["789012"],
-            status: "PENDING",
-            preamble: "#!/bin/bash\n#SBATCH --job-name=viz-boxplot\n#SBATCH --gres=gpu:1"
-        },
-        {
-            job_id: 345678,
-            command: "jrun preprocess --input data.csv --normalize --scale",
-            group_name: "preprocessing",
-            depends_on: ["789012"],
-            status: "COMPLETED",
-            preamble: "#!/bin/bash\n#SBATCH --job-name=preprocess\n#SBATCH --time=02:00:00\n#SBATCH --mem=8G",
-            start_time: "2024-01-15 09:50:00",
-            end_time: "2024-01-15 11:20:00"
-        },
-        {
-            job_id: 901234,
-            command: "jrun model_training --model linear --epochs 100",
-            group_name: "ml_pipeline",
-            depends_on: ["345678"],
+            job_id: 200004,
+            command: "python eval.py --group_id 100004",
+            group_name: "gpt:train",
+            depends_on: ["200003"],
             status: "RUNNING",
-            preamble: "#!/bin/bash\n#SBATCH --job-name=train-linear\n#SBATCH --gres=gpu:2\n#SBATCH --time=04:00:00",
-            start_time: "2024-01-15 11:30:00",
+            preamble: "#!/bin/bash\n#SBATCH --job-name=train-gpt\n#SBATCH --gres=gpu:4\n#SBATCH --time=06:00:00\n#SBATCH --mem=64G",
+            start_time: "2024-01-15 08:30:00",
             stats: {
-                gpu_memory_used_mb: 20480,
-                gpu_memory_total_mb: 24576,
-                gpu_count: 2,
-                cpu_usage: 92
+                gpu_memory_used_mb: 45056,
+                gpu_memory_total_mb: 65536,
+                gpu_count: 4,
+                cpu_usage: 88
             }
         },
         {
-            job_id: 901235,
-            command: "jrun model_training --model random_forest --trees 500",
-            group_name: "ml_pipeline",
-            depends_on: ["345678"],
+            job_id: 400001,
+            command: "python plot.py --results eval_results/ --output plots/comparison.png",
+            group_name: "plot",
+            depends_on: ["200002", "200004"],
             status: "PENDING",
-            preamble: "#!/bin/bash\n#SBATCH --job-name=train-rf\n#SBATCH --time=04:00:00\n#SBATCH --mem=16G"
+            preamble: "#!/bin/bash\n#SBATCH --job-name=plot-comparison\n#SBATCH --time=00:15:00\n#SBATCH --mem=4G"
         },
-        {
-            job_id: 901236,
-            command: "jrun model_training --model neural_net --layers 5",
-            group_name: "ml_pipeline",
-            depends_on: ["345678"],
-            status: "FAILED",
-            preamble: "#!/bin/bash\n#SBATCH --job-name=train-nn\n#SBATCH --gres=gpu:4",
-            start_time: "2024-01-15 11:30:00",
-            end_time: "2024-01-15 11:45:00",
-            error_message: "CUDA out of memory error"
-        },
-        {
-            job_id: 567890,
-            command: "jrun validation --cross-validate --folds 5",
-            group_name: "validation",
-            depends_on: ["123456", "123457", "345678"],
-            status: "PENDING",
-            preamble: "#!/bin/bash\n#SBATCH --job-name=validation-cv\n#SBATCH --time=01:30:00"
-        },
-        {
-            job_id: 567891,
-            command: "jrun validation --holdout --split 0.2",
-            group_name: "validation",
-            depends_on: ["123456", "123457", "345678"],
-            status: "PENDING",
-            preamble: "#!/bin/bash\n#SBATCH --job-name=validation-holdout\n#SBATCH --time=01:00:00"
-        },
-        {
-            job_id: 111222,
-            command: "jrun report --format pdf --template executive",
-            group_name: "reporting",
-            depends_on: ["567890", "567891"],
-            status: "PENDING",
-            preamble: "#!/bin/bash\n#SBATCH --job-name=report-pdf\n#SBATCH --time=00:30:00"
-        }
     ];
-
     // Global state
     let jobs = [];
     let allGroups = [];
@@ -1194,7 +1316,7 @@
             }
             const data = await response.json();
             console.log('Fetched jobs from API:', data);
-            return data;
+            // return data;
 
             // For development, simulate API delay and return dummy data
             await new Promise(resolve => setTimeout(resolve, 500));
