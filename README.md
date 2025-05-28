@@ -181,11 +181,14 @@ group:
 - [x] Job retry (`jrun retry JOB_ID`)
 - [x] Job delete subgraph
 - [x] Web app
+- [x] Improve visual for loop group
 
 ## Planned Features
 - [ ] Update afterany (allow some parent group failures)
 - [ ] View job logs in the web
-- [ ] Improve visual for loop group
+- [ ] Improve dependency (make markovian)
+
+<!-- sacct -j 6894879 --format=JobID,WorkDir -X --parsable2 -->
 
 ## Requirements
 

@@ -15,27 +15,31 @@ preambles:
     - "#SBATCH --error=slurm/slurm-%j.err"
 
 group:
-  name: "ml-pipeline"
+  name: "tjdnet"
   type: sequential
   jobs:
     # Parallel hyperparameter sweep
     - group:
+        name: "sweep"
         type: sweep
         sweep:
-          lr: [0.001, 0.01, 0.1]
-          model: [llama, gemma]
+          lr: [1e-3, 5e-4, 1e-4, 5e-5, 1e-5]
+          model: [llama, gpt2]
         preamble: gpu
-        sweep_template: "sleep 20 && echo 'python train.py --lr {lr} --model {model}'"
+        sweep_template: "python example_scripts/train.py --lr {lr} --model {model}"
     
     # Find best model and run tests
     - job:
+        name: "fbest"
         preamble: cpu
-        command: "sleep 20 && echo 'python find_best.py --metric eval_loss --group_id {group_id}'"
+        command: "python example_scripts/find_best.py --metric eval_loss --group_id {group_id}"
     
     - job:
+        name: "tbest"
         preamble: gpu
-        command: "sleep 20 && echo 'python test.py --model best_model.pt --group_id {group_id}'"
+        command: "python example_scripts/test.py --model best_model.pt --group_id {group_id}"
     
     - job:
+        name: "plot"
         preamble: cpu
-        command: "sleep 20 && echo 'python create_report.py --results test_results.json --group_id {group_id}'"
+        command: "python example_scripts/plot_results.py --results test_results.json --group_id {group_id}"

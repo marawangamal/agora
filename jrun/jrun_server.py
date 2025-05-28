@@ -1,8 +1,8 @@
 # jrun/serve.py
 
+from waitress import serve as waitress_serve
 from flask import Flask, jsonify, send_from_directory, request
 from pathlib import Path
-import sqlite3, json
 from jrun.job_viewer import JobViewer
 
 
@@ -18,7 +18,7 @@ def create_app(default_db: str, web_folder: Path) -> Flask:
 
         # If they asked for JSON mode, wrap with stats/count
         if request.args.get("format") == "json":
-            stats = viewer._get_status_totals(jobs)
+            stats = viewer._get_status_totals(jobs_data)
             return jsonify({"jobs": jobs_data, "stats": stats, "count": len(jobs_data)})
 
         # Otherwise just return array
@@ -44,5 +44,13 @@ def serve(db: str, host: str = "localhost", port: int = 3000, web_folder: str = 
         raise FileNotFoundError(f"Cannot find web/index.html at {web_path!r}")
 
     app = create_app(default_db=db, web_folder=web_path)
-    print(f"🔌 Serving on http://{host}:{port}  (DB: {db})")
-    app.run(host=host, port=port, debug=True)
+    # print(f"🔌 Serving on http://{host}:{port}  (DB: {db})")
+
+    print("🚀 jrun web server")
+    print(f"   Running on http://{host}:{port}")
+    print(f"   Database: {Path(db).name}")
+    print("")
+    print("   Open the URL above to view job graph.")
+    print("   Press Ctrl+C to stop")
+
+    waitress_serve(app, host=host, port=port)

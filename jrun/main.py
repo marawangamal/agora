@@ -4,15 +4,14 @@ import appdirs
 from pathlib import Path
 from jrun.job_submitter import JobSubmitter
 from jrun.job_viewer import JobViewer
-from jrun.jrun_server_v2 import serve
-from jrun.jweb_server import serve_react_app  # Updated import
+from jrun.jrun_server import serve
 
 
 def get_default_db_path():
     """Get the default database path using appdirs user data directory."""
     app_data_dir = appdirs.user_data_dir("jrun")
     Path(app_data_dir).mkdir(parents=True, exist_ok=True)
-    return str(Path(app_data_dir) / "jrun.db")
+    return str(Path(app_data_dir) / "jrun-dev.db")
 
 
 def ask_user_yes_no_question(
@@ -239,31 +238,11 @@ def main():
     # Start web server
     elif args.cmd == "serve":
         try:
-            # # Auto-detect build directory if not specified
-            # build_dir = args.build_dir or get_build_directory()
-
-            # print(f"🔍 Looking for Next.js build at: {build_dir}")
-
-            # # Check if build directory exists
-            # if not Path(build_dir).exists():
-            #     print(f"❌ Build directory not found: {build_dir}")
-            #     print(f"💡 Please build your Next.js app first:")
-            #     print(f"   cd jweb && npm run build")
-            #     exit(1)
-
-            # serve_react_app(
-            #     port=args.port,
-            #     host=args.host,
-            #     build_dir=build_dir,
-            #     open_browser=False,
-            #     blocking=True,
-            # )
             serve(
                 db=args.db,
                 host=args.host,
                 port=args.port,
-                web_folder="web",  # relative to project root
-                # web_folder="jweb/out",  # relative to project root
+                web_folder="web",
             )
         except Exception as e:
             print(f"❌ Failed to start server: {e}")
