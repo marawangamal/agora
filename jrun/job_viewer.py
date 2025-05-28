@@ -1,5 +1,5 @@
 import json
-from typing import Dict, List, Literal, Optional, Tuple, Union
+from typing import Dict, List, Optional, Tuple, Union
 from tabulate import tabulate
 from collections import Counter, defaultdict
 from html import escape
