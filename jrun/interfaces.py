@@ -22,9 +22,12 @@ class JobSpec:
     preamble: str
     group_name: str
     depends_on: List[str]
-    status: str = "UNKNOWN"
+    slurm_log: str
+    slurm_err: str
+    created_at: str
+    updated_at: str
+    status: str
     inactive_deps: List[str] = field(default_factory=list)
-    logs_dir: str = get_default_logs_dir()
     loop_id: Optional[str] = None
 
     @property
@@ -49,14 +52,10 @@ class JobSpec:
         """Replace SBATCH log paths with the default logs directory."""
         updated_lines = []
         for line in sbatch_lines:
-            if line.startswith("#SBATCH --output="):
-                updated_lines.append(
-                    f"#SBATCH --output={osp.join(self.logs_dir, 'slurm-%j.out')}"
-                )
-            elif line.startswith("#SBATCH --error="):
-                updated_lines.append(
-                    f"#SBATCH --error={osp.join(self.logs_dir, 'slurm-%j.err')}"
-                )
+            if line.startswith("#SBATCH --output=") and self.slurm_log:
+                updated_lines.append(f"#SBATCH --output={self.slurm_log}")
+            elif line.startswith("#SBATCH --error=") and self.slurm_err:
+                updated_lines.append(f"#SBATCH --error={self.slurm_err}")
             else:
                 updated_lines.append(line)
         return updated_lines

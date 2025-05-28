@@ -40,10 +40,13 @@ class JobDB:
             command TEXT NOT NULL,
             preamble TEXT NOT NULL,
             group_name TEXT NOT NULL,
-            depends_on TEXT,
-            loop_id TEXT,
+            depends_on TEXT NOT NULL,  -- JSON text for list of job IDs
+            slurm_log TEXT NOT NULL,
+            slurm_err TEXT NOT NULL,
             created_at TEXT NOT NULL,
             updated_at TEXT NOT NULL
+            loop_id TEXT,
+            inactive_deps TEXT NOT NULL DEFAULT '[]',  -- JSON text for inactive dependencies
         )
         """
         )
@@ -169,39 +172,15 @@ class JobDB:
     def insert_record(self, rec: JobSpec) -> None:
         """Insert a new job row (fails if job_id already exists)."""
         now = datetime.datetime.utcnow().isoformat(timespec="seconds")
+        values = rec.to_dict()
 
-        # job_id: int
-        # command: str
-        # preamble: str
-        # group_name: str
-        # depends_on: List[str]
-        # status: str = "UNKNOWN"
-        # inactive_deps: List[str] = field(default_factory=list)
-        # logs_dir: str = get_default_logs_dir()
-        # loop_id: Optional[str] = None
+        # Build the SQL dynamically
+        columns = ", ".join(values.keys())
+        placeholders = ", ".join(f":{k}" for k in values.keys())
 
         with sqlite3.connect(self.db_path) as conn:
             cur = conn.cursor()
-            cur.execute(
-                """
-                INSERT INTO jobs (
-                    job_id, command, preamble, group_name,
-                    depends_on, loop_id, created_at, updated_at
-                )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                """,
-                (
-                    str(rec.job_id),
-                    rec.command,
-                    rec.preamble,
-                    rec.group_name,
-                    json.dumps(rec.depends_on),  # store list as JSON text
-                    # inverse: json.loads(rec.depends_on),
-                    rec.loop_id,
-                    now,
-                    now,
-                ),
-            )
+            cur.execute(f"INSERT INTO jobs ({columns}) VALUES ({placeholders})", values)
             conn.commit()
 
     def update_record(self, rec: JobSpec):
@@ -220,24 +199,17 @@ class JobDB:
     def get_job_by_id(self, job_id: int) -> JobSpec:
         """Get a job by its ID."""
         conn = sqlite3.connect(self.db_path)
+        conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
-
-        # Get job information
-        cursor.execute(
-            "SELECT job_id, command, preamble, group_name, depends_on FROM jobs WHERE job_id = ?",
-            (job_id,),
-        )
+        cursor.execute("SELECT * FROM jobs WHERE job_id = ?", (job_id,))
         row = cursor.fetchone()
         conn.close()
 
         if row:
-            return JobSpec(
-                job_id=row[0],
-                command=row[1],
-                preamble=row[2],
-                group_name=row[3],
-                depends_on=json.loads(row[4]),
-            )
+            row_dict = dict(row)
+            row_dict["depends_on"] = json.loads(row_dict["depends_on"])
+            return JobSpec(**row_dict)
+
         raise ValueError(f"Job with ID {job_id} not found in the database.")
 
     def get_job_by_command(self, command: str) -> Optional[JobSpec]:
@@ -253,10 +225,11 @@ class JobDB:
     ) -> List[JobSpec]:
         """Get jobs with optional filters."""
         conn = sqlite3.connect(self.db_path)
+        conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
 
-        # Get basic job information
-        query = "SELECT job_id, command, preamble, group_name, depends_on, loop_id FROM jobs"
+        # Get all job information
+        query = "SELECT * FROM jobs"
         params = []
 
         # Remove status from filters
@@ -278,13 +251,13 @@ class JobDB:
 
         cursor.execute(query, params)
         jobs = cursor.fetchall()
-        job_ids = [job[0] for job in jobs]
+        job_ids = [job["job_id"] for job in jobs]
 
         # Get job statuses from SLURM
         if not ignore_status:
             job_statuses = self._get_job_statuses(job_ids)
         else:
-            job_statuses = {str(job[0]): "UNKNOWN" for job in jobs}
+            job_statuses = {str(job["job_id"]): "UNKNOWN" for job in jobs}
 
         conn.close()
 
@@ -294,21 +267,25 @@ class JobDB:
             jobs = [
                 job
                 for job in jobs
-                if job_statuses.get(str(job[0]), "UNKNOWN").lower() == value.lower()
+                if job_statuses.get(str(job["job_id"]), "UNKNOWN").lower()
+                == value.lower()
             ]
 
-        return [
-            JobSpec(
-                job_id=row[0],
-                command=row[1],
-                preamble=row[2],
-                group_name=row[3],
-                depends_on=json.loads(row[4]),
-                loop_id=row[5],
-                status=job_statuses.get(str(row[0]), "UNKNOWN"),
+        # Convert to JobSpec objects
+        result = []
+        for row in jobs:
+            row_dict = dict(row)
+            # Handle JSON fields
+            row_dict["depends_on"] = json.loads(row_dict["depends_on"])
+            row_dict["inactive_deps"] = json.loads(row_dict["inactive_deps"])
+            # Override status with SLURM status if available
+            row_dict["status"] = job_statuses.get(
+                str(row_dict["job_id"]), row_dict["status"]
             )
-            for row in jobs
-        ]
+
+            result.append(JobSpec(**row_dict))
+
+        return result
 
     def update_depends_on(self, new_job_id: int, old_job_id: int) -> None:
         """Update all jobs that depend on old_job_id to depend on new_job_id instead."""
