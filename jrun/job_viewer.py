@@ -289,7 +289,7 @@ class JobViewer(JobDB):
             )
 
         # Print table using tabulate
-        headers = ["ID", "GROUP", "LOOP" "COMMAND", "STATUS"]
+        headers = ["ID", "GROUP", "LOOP", "COMMAND", "STATUS"]
         col_widths = [10, 10, 80, 10]
         # print("\n" + tabulate(table_data, headers=headers, tablefmt="simple"))
         print(

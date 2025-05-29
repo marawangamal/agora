@@ -224,7 +224,7 @@ class JobDB:
 
         # Get job information
         cursor.execute(
-            "SELECT job_id, command, preamble, group_name, depends_on FROM jobs WHERE job_id = ?",
+            "SELECT job_id, command, preamble, group_name, depends_on, loop_id FROM jobs WHERE job_id = ?",
             (job_id,),
         )
         row = cursor.fetchone()
@@ -237,6 +237,7 @@ class JobDB:
                 preamble=row[2],
                 group_name=row[3],
                 depends_on=json.loads(row[4]),
+                loop_id=row[5],
             )
         raise ValueError(f"Job with ID {job_id} not found in the database.")
 
