@@ -10,7 +10,7 @@ from typing import Callable, Dict, List, Optional, Union
 
 import yaml
 from jrun._base import JobDB
-from jrun.interfaces import JobSpec, PGroup, PJob
+from jrun.interfaces import Job, JobInsert, JobSpec, PGroup, PJob
 
 JOB_RE = re.compile(r"Submitted batch job (\d+)")
 # TODO: Add deps table to schema and use a view to get deps on the fly
@@ -20,22 +20,17 @@ class JobSubmitter(JobDB):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-    def _parse_job_id(self, result: str) -> int:
-        # job_id = result.split(" ")[-1].strip()
-        # if not job_id:
-        #     raise ValueError("Failed to parse job ID from sbatch output.")
-        # return job_id
-        # Typical line: "Submitted batch job 123456"
+    def _parse_job_id(self, result: str) -> str:
         m = JOB_RE.search(result)
         if m:
-            jobid = int(m.group(1))
+            jobid = m.group(1)
             return jobid
         else:
             raise RuntimeError(f"Could not parse job id from sbatch output:\n{result}")
 
     def _submit_jobspec(
         self,
-        job_spec: JobSpec,
+        job: Job,
         dry: bool = False,
         ignore_statuses: List[str] = ["PENDING", "RUNNING", "COMPLETED"],
     ):
@@ -48,43 +43,94 @@ class JobSubmitter(JobDB):
         """
 
         if dry:
-            job_spec.command += " --dry"
+            job.command += " --dry"
 
         # Create a temporary script file
         with tempfile.NamedTemporaryFile(mode="w", suffix=".sh", delete=False) as f:
             script_path = f.name
-            f.write(job_spec.to_script(deptype=self.deptype))
+            f.write(job.to_script(deptype=self.deptype))
 
         try:
             # Check if the job is already submitted
-            prev_job = self.get_job_by_command(job_spec.command)
+            prev_job = self.get_jobs([f"command='{job.command}'"])[0]
             if prev_job:
                 if prev_job.status in ignore_statuses:
-                    print(f"Job with command '{job_spec.command}' already submitted")
-                    return prev_job.job_id
+                    print(f"Job with command '{job.command}' already submitted")
+                    return prev_job.id
                 else:
-                    print(f"Job with command '{job_spec.command}' failed, resubmitting")
+                    print(f"Job with command '{job.command}' failed, resubmitting")
 
             # Submit the job using sbatch
             result = os.popen(f"sbatch {script_path}").read()
-            job_id = self._parse_job_id(result)
-            job_spec.job_id = job_id
-            self.insert_record(JobSpec(**job_spec.to_dict()))
-            print(f"Submitted job with ID {job_id}")
+            job.id = self._parse_job_id(result)
+            self.create_job(JobInsert(**{
+                k:v  for k, v in job.to_dict().items() if k in JobInsert.__dataclass_fields__
+            }))
+            print(f"Submitted job with ID {job.id}")
 
             # clean up
             if prev_job:
                 # remove the previous job from the database
-                self.delete_record(prev_job.job_id)
+                self.delete_record(prev_job.id)
 
             # add small delay
             time.sleep(0.1)
-            return job_id
+            return job.id
         finally:
             # Clean up the temporary file
             os.unlink(script_path)
 
-    def cancel(self, job_id: int):
+
+    def _submit_jobspec_v2(
+        self,
+        job: Job,
+        dry: bool = False,
+        ignore_statuses: List[str] = ["PENDING", "RUNNING", "COMPLETED"],
+    ):
+        """Submit a single job to SLURM and return the job ID.
+
+        Args:
+            job_spec: The job specification to submit
+        Returns:
+            The job ID as a string
+        """
+
+        if dry:
+            job.command += " --dry"
+
+        # Create a temporary script file
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".sh", delete=False) as f:
+            script_path = f.name
+            f.write(job.to_script(deptype=self.deptype))
+
+        try:
+            # Check if the job is already submitted
+            prev_job = self.get_jobs([f"command='{job.command}'"])[0]
+
+            # Submit the job using sbatch
+            result = os.popen(f"sbatch {script_path}").read()
+            job.id = self._parse_job_id(result)
+            print(f"Submitted job with ID {job.id}")
+
+            upsert_job =JobInsert(**{
+                k: v for k, v in job.to_dict().items() if k in JobInsert.__dataclass_fields__
+            })
+
+            # clean up
+            if prev_job:
+                # remove the previous job from the database
+                self.update_job(prev_job.id, upsert_job)
+            else:
+                self.create_job(upsert_job)
+            # add small delay
+            time.sleep(0.1)
+            return job.id
+        finally:
+            # Clean up the temporary file
+            os.unlink(script_path)
+
+
+    def cancel(self, job_id: str):
         """Cancel jobs with the given job IDs."""
         try:
             subprocess.run(["scancel", str(job_id)], check=True)
@@ -96,19 +142,12 @@ class JobSubmitter(JobDB):
         """Cancel all jobs in the database."""
         jobs = self.get_jobs()
         for job in jobs:
-            self.cancel(job.job_id)
+            self.cancel(job.id)
 
-    def delete(self, job_ids: Optional[List[int]] = None, cascade: bool = False):
+    def delete(self, job_ids: Optional[List[str]] = None, cascade: bool = False):
         """Delete jobs with the given job IDs."""
-        if job_ids is None:
-            # If no job IDs are provided, delete all jobs
-            job_ids = [job.job_id for job in self.get_jobs()]
-
-        for job_id in job_ids:
-            self.cancel(job_id)
-            self.delete_record(job_id)
-            if cascade:
-                self.delete([c.job_id for c in self.get_children(job_id)])
+        for id in job_ids or []:
+            self.delete_job(id, on_delete=lambda id: self.cancel(id), cascade=cascade)
 
     def retry(self, job_id: int, job: Optional[JobSpec] = None, force: bool = False):
         """Retry a job with the given job ID."""
@@ -117,7 +156,7 @@ class JobSubmitter(JobDB):
         inactive_jobs = [j for j in self.get_jobs() if j.status == "COMPLETED"]
         if job:
             job.inactive_deps = [
-                j.job_id for j in inactive_jobs if j.job_id in job.depends_on
+                j.id for j in inactive_jobs if j.id in job.depends_on
             ]
             print(f"Retrying job {job_id}")
             ignore_statuses = ["RUNNING", "COMPLETED"] if not force else []
@@ -132,7 +171,7 @@ class JobSubmitter(JobDB):
                 child.depends_on.append(str(new_job_id))
                 # delete the old job
                 # self.delete_record(child)
-                self.retry(child.job_id, child)
+                self.retry(child.id, child)
 
         else:
             print(f"Job {job_id} not found in the database.")

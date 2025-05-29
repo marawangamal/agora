@@ -5,7 +5,7 @@ from collections import Counter, defaultdict
 from html import escape
 
 from jrun._base import JobDB
-from jrun.interfaces import JobSpec
+from jrun.interfaces import Job
 
 SABBRV = {
     "COMPLETED": "✅",
@@ -23,20 +23,20 @@ class JobViewer(JobDB):
         super().__init__(*args, **kwargs)
 
     def _group_jobs(
-        self, jobs: List[JobSpec]
-    ) -> Dict[Tuple[frozenset, frozenset], List[JobSpec]]:
+        self, jobs: List[Job]
+    ) -> Dict[Tuple[frozenset, frozenset], List[Job]]:
         """Group jobs that have the same parents and children."""
         # Build dependency graph (parent -> children)
         parent_to_child_map = defaultdict(set)
         for job in jobs:
-            for dep in job.depends_on:
-                parent_to_child_map[dep].add(job.job_id)
+            for dep in job.parents:
+                parent_to_child_map[dep].add(job.id)
 
         # Group jobs by their full dependency signature
         groups = defaultdict(list)
         for job in jobs:
-            parents = frozenset(job.depends_on)
-            children = frozenset(parent_to_child_map.get(job.job_id, set()))
+            parents = frozenset(job.parents)
+            children = frozenset(parent_to_child_map.get(job.id, set()))
             groups[(parents, children)].append(job)
 
         return groups
@@ -74,7 +74,7 @@ class JobViewer(JobDB):
         }
         return color_map.get(status, "\033[90m")  # Gray for unknown
 
-    def _get_status_totals(self, jobs: List[JobSpec]):
+    def _get_status_totals(self, jobs: List[Job]):
         status_counts = Counter(job.status for job in jobs)
         total = len(jobs)
         done = status_counts.get("COMPLETED", 0)
@@ -95,7 +95,7 @@ class JobViewer(JobDB):
             "total": total,
         }
 
-    def _get_footer(self, jobs: List[JobSpec]) -> str:
+    def _get_footer(self, jobs: List[Job]) -> str:
         """Generate a footer with job status summary."""
         status = self._get_status_totals(jobs)
         finished = sum(
@@ -124,15 +124,15 @@ class JobViewer(JobDB):
         print("Job Dependencies:")
         print("=" * border_width)
 
-        job_statuses = {job.job_id: job.status for job in jobs}
+        job_statuses = {job.id: job.status for job in jobs}
 
         for job in jobs:
-            deps = " <- " + ", ".join(job.depends_on) if job.depends_on else ""
+            deps = " <- " + ", ".join(job.parents) if job.parents else ""
             cmd = job.command[:30] + "..." if len(job.command) > 30 else job.command
-            status = job_statuses.get(str(job.job_id), "UNKNOWN")  # type: ignore
+            status = job_statuses.get(str(job.id), "UNKNOWN")  # type: ignore
             status_color = self._get_status_color(status)
             print(
-                f"{job.job_id} [{job.group_name}]: ({status_color}{status}\033[0m): {cmd}{deps}"
+                f"{job.id} [{job.group_name}]: ({status_color}{status}\033[0m): {cmd}{deps}"
             )
 
         print("-" * border_width)
@@ -161,7 +161,7 @@ class JobViewer(JobDB):
         table_data = []
         col_widths = [40, 10] + [20] * 6 + [80, 80]
         for group in self._group_jobs(jobs).values():
-            id = self._smart_range_display([j.job_id for j in group])
+            id = self._smart_range_display([j.id for j in group])
             group_name = group[0].group_name or "root"
             status = self._get_status_totals(group)
             finished = sum(
@@ -181,7 +181,7 @@ class JobViewer(JobDB):
 
             cmd = group[0].command[:25] + ("..." if len(group[0].command) > 25 else "")
             deps = self._smart_range_display(
-                group[0].depends_on  # type:ignore
+                group[0].parents  # type:ignore
             )  #  (i.e., parents)
             table_data.append([id, group_name, *stat_arr, cmd, deps])
 
@@ -225,20 +225,20 @@ class JobViewer(JobDB):
         # Nodes
         id_map = {}
         for job in jobs:
-            sid = f"S{job.job_id}"  # IDs must not start with a digit
-            id_map[job.job_id] = sid
+            sid = f"S{job.id}"  # IDs must not start with a digit
+            id_map[job.id] = sid
             # NEW – no escape(), just swap double quotes for single quotes
             clean_cmd = short(job.command).replace('"', "'")
             label = (
-                f"{icons.get(job.status,'?')} {job.job_id}<br/><code>{clean_cmd}</code>"
+                f"{icons.get(job.status,'?')} {job.id}<br/><code>{clean_cmd}</code>"
             )
             print(f'    state "{label}" as {sid}')
 
         # Edges
         for job in jobs:
-            for dep in job.depends_on:
+            for dep in job.parents:
                 if dep in id_map:
-                    print(f"    {id_map[dep]} --> {id_map[job.job_id]}")
+                    print(f"    {id_map[dep]} --> {id_map[job.id]}")
 
         print(
             "\nPaste the code block above into https://mermaid.live (or any Markdown viewer with Mermaid support) to render the diagram."
@@ -253,11 +253,11 @@ class JobViewer(JobDB):
         for job in jobs:
             jobs_data.append(
                 {
-                    "job_id": job.job_id,
+                    "job_id": job.id,
                     "status": job.status,
                     "command": job.command,
                     "group_name": job.group_name,
-                    "depends_on": job.depends_on,
+                    "depends_on": job.parents,
                     "preamble": job.preamble,
                     "loop_id": job.loop_id,
                 }
@@ -280,7 +280,7 @@ class JobViewer(JobDB):
         for job in jobs:
             table_data.append(
                 [
-                    job.job_id,
+                    job.id,
                     job.group_name,
                     job.loop_id or "N/A",
                     job.command,

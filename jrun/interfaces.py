@@ -1,31 +1,39 @@
 from dataclasses import asdict, dataclass, field
 from typing import Any, Dict, List, Literal, Optional, Union
-import os.path as osp
-import appdirs
-from pathlib import Path
 
-
-def get_default_logs_dir() -> str:
-    """Get (and create) a default logs directory under the jrun user‐data dir."""
-    app_data_dir = Path(appdirs.user_data_dir("jrun"))
-    logs_dir = app_data_dir / "logs"
-    logs_dir.mkdir(parents=True, exist_ok=True)
-    return str(logs_dir)
 
 
 @dataclass
-class JobSpec:
-    """Specification for a SLURM job."""
-
-    job_id: int
+class JobInsert:
+    id: str
     command: str
     preamble: str
-    group_name: str
-    depends_on: List[str]
-    status: str = "UNKNOWN"
-    inactive_deps: List[str] = field(default_factory=list)
-    logs_dir: str = get_default_logs_dir()
-    loop_id: Optional[str] = None
+    created_at: str
+    updated_at: str
+    node_id: Optional[str] = None
+    node_name: Optional[str] = None
+
+    def to_dict(self) -> Dict[str, Any]:
+        return asdict(self)
+
+@dataclass
+class Job:
+    """Specification for a SLURM job."""
+
+    id: str
+    command: str
+    preamble: str
+    created_at: str
+    updated_at: str
+    node_id: Optional[str] = None
+    node_name: Optional[str] = None
+    parents: List[str] = field(default_factory=list)
+    children: List[str] = field(default_factory=list)
+    # Fields not in vw_jobs
+    status: str = "UNKNOWN"  
+    slurm_log: Optional[str] = None
+    slurm_err: Optional[str] = None
+
 
     @property
     def preamble_sbatch(self) -> List[str]:
@@ -35,7 +43,6 @@ class JobSpec:
             line = line.strip()
             if line.startswith("#SBATCH") or line.startswith("#!/"):
                 sbatch_lines.append(line)
-        # return self._replace_sbatch_log_paths( )
         return sbatch_lines
 
     @property
@@ -45,22 +52,6 @@ class JobSpec:
             if line:  # Non-empty, non-SBATCH line
                 setup_lines.append(line)
         return setup_lines
-
-    # def _replace_sbatch_log_paths(self, sbatch_lines: List[str]) -> List[str]:
-    #     """Replace SBATCH log paths with the default logs directory."""
-    #     updated_lines = []
-    #     for line in sbatch_lines:
-    #         if line.startswith("#SBATCH --output="):
-    #             updated_lines.append(
-    #                 f"#SBATCH --output={osp.join(self.logs_dir, 'slurm-%j.out')}"
-    #             )
-    #         elif line.startswith("#SBATCH --error="):
-    #             updated_lines.append(
-    #                 f"#SBATCH --error={osp.join(self.logs_dir, 'slurm-%j.err')}"
-    #             )
-    #         else:
-    #             updated_lines.append(line)
-    #     return updated_lines
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert the dataclass instance to a dictionary."""
@@ -86,15 +77,12 @@ class JobSpec:
         script_lines = sbatch_lines.copy()
 
         # Add dependency information if needed (must come with other SBATCH directives)
-        if self.depends_on:
+        if self.parents:
             # Convert job IDs to a colon-separated string
             # (e.g., "123:456:789")
             # Filter out inactive dependencies
-            active_deps = [
-                dep for dep in self.depends_on if dep not in self.inactive_deps
-            ]
-            if len(active_deps) != 0:
-                dependencies = ":".join(active_deps)
+            if len(self.parents) != 0:
+                dependencies = ":".join(self.parents)
                 script_lines.append(f"#SBATCH --dependency={deptype}:{dependencies}")
 
         # Add setup commands

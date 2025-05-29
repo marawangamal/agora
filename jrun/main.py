@@ -221,10 +221,10 @@ def main():
             # If no job IDs are provided, ask for confirmation to delete the database
             ask_user_yes_no_question(
                 question="Are you sure you want to delete the database? (y/n): ",
-                on_yes=lambda: jr.delete(),
+                on_yes=lambda: jr.delete_job(),
                 on_no=lambda: print("Database deletion cancelled."),
             )
-        jr.delete(args.job_ids, cascade=True)
+        jr.delete_job(args.job_ids, cascade=True)
 
     # Cancel jobs
     elif args.cmd == "cancel":

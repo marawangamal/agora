@@ -10,7 +10,7 @@ from typing import Optional
 import unittest
 from unittest.mock import patch, MagicMock
 
-from jrun.interfaces import JobSpec
+from jrun.interfaces import Job
 from jrun.job_submitter import JobSubmitter
 from jrun.job_viewer import JobViewer
 
@@ -137,12 +137,12 @@ class TestJrunSimple(unittest.TestCase):
         # Verify jobs are in the database
         jobs = viewer.get_jobs()
         self.assertEqual(len(jobs), 2)
-        job_ids_list = [job.job_id for job in jobs]
+        job_ids_list = [job.id for job in jobs]
         self.assertIn("12345", job_ids_list)
         self.assertIn("12346", job_ids_list)
 
         # Verify second job depends on first job
-        self.assertIn("12345", jobs[1].depends_on)
+        self.assertIn("12345", jobs[1].parents)
 
         print("Test completed successfully!")
 
@@ -218,14 +218,14 @@ class TestJrunSimple(unittest.TestCase):
         ##### Run tests
         # Verify submission
         jobs = viewer.get_jobs()
-        job_ids_list = [job.job_id for job in jobs]
+        job_ids_list = [job.id for job in jobs]
         self.assertIn("12345", job_ids_list)
         self.assertIn("12346", job_ids_list)
         self.assertIn("12347", job_ids_list)
 
         # Verify dependencies
-        self.assertIn("12345", jobs[2].depends_on)
-        self.assertIn("12346", jobs[2].depends_on)
+        self.assertIn("12345", jobs[2].parents)
+        self.assertIn("12346", jobs[2].parents)
 
     @patch("os.popen")
     def test_sweep_workflow(self, mock_popen):
@@ -278,7 +278,7 @@ class TestJrunSimple(unittest.TestCase):
 
         # Verify submission
         jobs = viewer.get_jobs()
-        job_ids_list = [job.job_id for job in jobs]
+        job_ids_list = [job.id for job in jobs]
         self.assertIn("12345", job_ids_list)
         self.assertIn("12346", job_ids_list)
         self.assertIn("12347", job_ids_list)
@@ -343,14 +343,14 @@ class TestJrunSimple(unittest.TestCase):
 
         # Verify submission
         jobs = viewer.get_jobs()
-        job_ids_list = [job.job_id for job in jobs]
+        job_ids_list = [job.id for job in jobs]
         self.assertIn("12345", job_ids_list)
         self.assertIn("12346", job_ids_list)
 
         # Verify dependencies
-        self.assertIn("12345", jobs[1].depends_on)
-        self.assertIn("12345", jobs[2].depends_on)
-        self.assertIn("12346", jobs[2].depends_on)
+        self.assertIn("12345", jobs[1].parents)
+        self.assertIn("12345", jobs[2].parents)
+        self.assertIn("12346", jobs[2].parents)
 
     @patch("os.popen")
     def test_groupid_workflow(self, mock_popen):
@@ -678,10 +678,10 @@ class TestJrunSimple(unittest.TestCase):
         # Verify submission
         jobs = viewer.get_jobs()
         self.assertEqual(len(jobs), 4)
-        job_ids_list = [job.job_id for job in jobs]
+        job_ids_list = [job.id for job in jobs]
         for i in range(len(job_ids_list)):
             self.assertEqual(
-                " ".join(jobs[i].depends_on),
+                " ".join(jobs[i].parents),
                 " ".join([str(j) for j in job_ids_list[:i]]),
             )
 
