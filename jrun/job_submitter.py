@@ -7,23 +7,25 @@ import subprocess
 import tempfile
 import time
 from typing import Callable, Dict, List, Optional, Union
-import smtplib
-from email.mime.text import MIMEText
 
 import yaml
 from jrun._base import JobDB
 from jrun.interfaces import JobSpec, PGroup, PJob
 
 JOB_RE = re.compile(r"Submitted batch job (\d+)")
+# TODO: Add deps table to schema and use a view to get deps on the fly
+
 
 class JobSubmitter(JobDB):
-    def __init__(self, *args, email_notifications: bool = False, max_retries: int = 3, **kwargs):
+    def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.email_notifications = email_notifications
-        self.max_retries = max_retries
-        self.retry_counts = {}
 
     def _parse_job_id(self, result: str) -> int:
+        # job_id = result.split(" ")[-1].strip()
+        # if not job_id:
+        #     raise ValueError("Failed to parse job ID from sbatch output.")
+        # return job_id
+        # Typical line: "Submitted batch job 123456"
         m = JOB_RE.search(result)
         if m:
             jobid = int(m.group(1))
@@ -31,86 +33,29 @@ class JobSubmitter(JobDB):
         else:
             raise RuntimeError(f"Could not parse job id from sbatch output:\n{result}")
 
-    def _get_resource_usage(self, job_id: str) -> Dict[str, float]:
-        """Get resource usage statistics for a job."""
-        try:
-            cmd = f"sacct -j {job_id} --format=MaxRSS,MaxVMSize,ElapsedRaw --noheader --parsable2"
-            result = subprocess.check_output(cmd, shell=True).decode().strip()
-            if result:
-                maxrss, maxvmsize, elapsed = result.split('|')
-                return {
-                    'max_memory_gb': float(maxrss.replace('K', '')) / 1024 / 1024,
-                    'max_vmem_gb': float(maxvmsize.replace('K', '')) / 1024 / 1024,
-                    'elapsed_seconds': float(elapsed)
-                }
-        except:
-            pass
-        return {}
-
-    def _send_notification(self, job_id: str, status: str, error: Optional[str] = None):
-        """Send email notification about job status."""
-        if not self.email_notifications:
-            return
-
-        job = self.get_job_by_id(job_id)
-        subject = f"Job {job_id} {status}"
-        body = f"""
-        Job ID: {job_id}
-        Status: {status}
-        Command: {job.command}
-        """
-        
-        if error:
-            body += f"\nError: {error}"
-
-        if status in ['COMPLETED', 'FAILED']:
-            usage = self._get_resource_usage(job_id)
-            if usage:
-                body += f"\nResource Usage:\n"
-                body += f"Max Memory: {usage['max_memory_gb']:.2f} GB\n"
-                body += f"Max Virtual Memory: {usage['max_vmem_gb']:.2f} GB\n"
-                body += f"Elapsed Time: {usage['elapsed_seconds']/3600:.2f} hours"
-
-        try:
-            msg = MIMEText(body)
-            msg['Subject'] = subject
-            msg['From'] = os.environ.get('JRUN_EMAIL_FROM', 'jrun@localhost')
-            msg['To'] = os.environ.get('JRUN_EMAIL_TO', '')
-
-            if msg['To']:
-                s = smtplib.SMTP('localhost')
-                s.send_message(msg)
-                s.quit()
-        except:
-            pass # Silently fail if email sending fails
-
     def _submit_jobspec(
         self,
         job_spec: JobSpec,
         dry: bool = False,
         ignore_statuses: List[str] = ["PENDING", "RUNNING", "COMPLETED"],
-        timeout: Optional[int] = None
     ):
-        """Submit a single job to SLURM and return the job ID."""
+        """Submit a single job to SLURM and return the job ID.
+
+        Args:
+            job_spec: The job specification to submit
+        Returns:
+            The job ID as a string
+        """
 
         if dry:
             job_spec.command += " --dry"
 
-        # Add timeout if specified
-        if timeout:
-            job_spec.preamble += f"\n#SBATCH --time={timeout}"
-
+        # Create a temporary script file
         with tempfile.NamedTemporaryFile(mode="w", suffix=".sh", delete=False) as f:
             script_path = f.name
             f.write(job_spec.to_script(deptype=self.deptype))
 
         try:
-            # Check if job should be retried
-            job_id = str(job_spec.job_id)
-            if job_id in self.retry_counts and self.retry_counts[job_id] >= self.max_retries:
-                print(f"Job {job_id} has exceeded maximum retry count")
-                return None
-
             # Check if the job is already submitted
             prev_job = self.get_job_by_command(job_spec.command)
             if prev_job:
@@ -119,7 +64,6 @@ class JobSubmitter(JobDB):
                     return prev_job.job_id
                 else:
                     print(f"Job with command '{job_spec.command}' failed, resubmitting")
-                    self.retry_counts[job_id] = self.retry_counts.get(job_id, 0) + 1
 
             # Submit the job using sbatch
             result = os.popen(f"sbatch {script_path}").read()
@@ -128,48 +72,17 @@ class JobSubmitter(JobDB):
             self.insert_record(JobSpec(**job_spec.to_dict()))
             print(f"Submitted job with ID {job_id}")
 
-            # Set up monitoring
-            self._send_notification(str(job_id), "SUBMITTED")
-
-            # Clean up
+            # clean up
             if prev_job:
+                # remove the previous job from the database
                 self.delete_record(prev_job.job_id)
 
+            # add small delay
             time.sleep(0.1)
             return job_id
         finally:
+            # Clean up the temporary file
             os.unlink(script_path)
-
-    def submit(
-        self,
-        file: str,
-        dry: bool = False,
-        debug: bool = False,
-        use_group_id: bool = False,
-        batch_size: Optional[int] = None,
-        timeout: Optional[int] = None
-    ):
-        """Parse the YAML file and submit jobs."""
-        cfg = yaml.safe_load(open(file))
-
-        preamble_map = {
-            name: "\n".join(lines) for name, lines in cfg["preambles"].items()
-        }
-
-        # Handle job batching
-        if batch_size:
-            # Implement job array submission logic here
-            pass
-
-        submit_fn = lambda job: self._submit_jobspec(job, dry=dry, timeout=timeout)
-        self.walk(
-            node=self._parse_group_dict(cfg["group"]),
-            preamble_map=preamble_map,
-            debug=debug,
-            depends_on=[],
-            submitted_jobs=[],
-            submit_fn=submit_fn,
-        )
 
     def cancel(self, job_id: int):
         """Cancel jobs with the given job IDs."""
@@ -223,6 +136,30 @@ class JobSubmitter(JobDB):
 
         else:
             print(f"Job {job_id} not found in the database.")
+
+    def submit(
+        self,
+        file: str,
+        dry: bool = False,
+        debug: bool = False,
+        use_group_id: bool = False,
+    ):
+        """Parse the YAML file and submit jobs."""
+        cfg = yaml.safe_load(open(file))
+
+        preamble_map = {
+            name: "\n".join(lines) for name, lines in cfg["preambles"].items()
+        }
+
+        submit_fn = lambda job: self._submit_jobspec(job, dry=dry)
+        self.walk(
+            node=self._parse_group_dict(cfg["group"]),
+            preamble_map=preamble_map,
+            debug=debug,
+            depends_on=[],
+            submitted_jobs=[],
+            submit_fn=submit_fn,
+        )
 
     def walk(
         self,
