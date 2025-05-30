@@ -209,12 +209,16 @@ class JobDB:
 
     def delete_job(self, job_id: str, cascade: bool = True, on_delete: Optional[Callable[[str], None]] = None) -> None:
 
-        job = self.get_jobs([f"id={job_id}"], ignore_status=True)[0]
-
+        jobs = self.get_jobs([f"id={job_id}"], ignore_status=True)
+        job = jobs[0] if jobs else None
+        if not job:
+            print(f"Job {job_id} not found, nothing to delete.")
+            return
+        
         with sqlite3.connect(self.db_path) as conn:
             cur = conn.cursor()
             cur.execute(
-                "DELETE FROM jobs WHERE job_id = ?",
+                "DELETE FROM jobs WHERE id = ?",
                 (str(job_id),),
             )
             conn.commit()

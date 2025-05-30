@@ -67,14 +67,6 @@ class Job:
         # Split preamble into SBATCH directives and setup commands
         sbatch_lines = self.preamble_sbatch
         setup_lines = self.preamble_setup
-
-        # for line in self.preamble.split("\n"):
-        #     line = line.strip()
-        #     if line.startswith("#SBATCH") or line.startswith("#!/"):
-        #         sbatch_lines.append(line)
-        #     elif line:  # Non-empty, non-SBATCH line
-        #         setup_lines.append(line)
-
         script_lines = sbatch_lines.copy()
 
         # Add dependency information if needed (must come with other SBATCH directives)

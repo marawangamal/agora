@@ -81,7 +81,6 @@ class JobSubmitter(JobDB):
             # Clean up the temporary file
             os.unlink(script_path)
 
-
     def cancel(self, job_id: str):
         """Cancel jobs with the given job IDs."""
         try:
@@ -98,7 +97,12 @@ class JobSubmitter(JobDB):
 
     def delete(self, job_ids: Optional[List[str]] = None, cascade: bool = False):
         """Delete jobs with the given job IDs."""
-        for id in job_ids or []:
+        if not job_ids:
+            print("No job IDs provided, deleting all jobs in the database.")
+            job_ids = [job.id for job in self.get_jobs(ignore_status=True)]
+
+        for id in job_ids:
+            print(f"Deleting job {id}")
             self.delete_job(id, on_delete=lambda id: self.cancel(id), cascade=cascade)
 
     def retry(self, job_id: str, job: Optional[Job] = None, force: bool = False):

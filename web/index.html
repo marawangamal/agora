@@ -1385,7 +1385,7 @@
     function initializeFilters() {
         // Populate group filters
         const groupFilters = document.getElementById('group-filters');
-        const uniqueGroups = [...new Set(jobs.map(job => job.group_name))].sort();
+        const uniqueGroups = [...new Set(jobs.map(job => job.node_name))].sort();
         
         groupFilters.innerHTML = uniqueGroups.map(group => 
             `<div class="filter-chip" data-group="${group}" onclick="toggleGroupFilter('${group}')">${group}</div>`
@@ -1464,9 +1464,9 @@
             // Search filter
             if (filters.search) {
                 const searchMatch = group.jobs.some(job => 
-                    job.job_id.toString().includes(filters.search) ||
+                    job.id.toString().includes(filters.search) ||
                     job.command.toLowerCase().includes(filters.search) ||
-                    job.group_name.toLowerCase().includes(filters.search)
+                    job.node_name.toLowerCase().includes(filters.search)
                 );
                 if (!searchMatch) return false;
             }
@@ -1482,7 +1482,7 @@
             // Group filter
             if (filters.groups.size > 0) {
                 const hasMatchingGroup = group.jobs.some(job => 
-                    filters.groups.has(job.group_name)
+                    filters.groups.has(job.node_name)
                 );
                 if (!hasMatchingGroup) return false;
             }
@@ -1492,15 +1492,15 @@
                 let dependencyMatch = false;
                 
                 if (filters.dependencies.has('has-deps')) {
-                    dependencyMatch = dependencyMatch || group.jobs.some(job => job.depends_on.length > 0);
+                    dependencyMatch = dependencyMatch || group.jobs.some(job => job.parents.length > 0);
                 }
                 
                 if (filters.dependencies.has('no-deps')) {
-                    dependencyMatch = dependencyMatch || group.jobs.some(job => job.depends_on.length === 0);
+                    dependencyMatch = dependencyMatch || group.jobs.some(job => job.parents.length === 0);
                 }
                 
                 if (filters.dependencies.has('root')) {
-                    dependencyMatch = dependencyMatch || group.jobs.every(job => job.depends_on.length === 0);
+                    dependencyMatch = dependencyMatch || group.jobs.every(job => job.parents.length === 0);
                 }
                 
                 if (!dependencyMatch) return false;
@@ -1626,8 +1626,8 @@
         
         // Build parent-child relationships
         jobs.forEach(job => {
-            const jobId = job.job_id.toString();
-            job.depends_on.forEach(depId => {
+            const jobId = job.id.toString();
+            job.parents.forEach(depId => {
                 if (!parentToChildMap.has(depId)) {
                     parentToChildMap.set(depId, new Set());
                 }
@@ -1638,14 +1638,14 @@
         // Group jobs by dependency signature
         const groupMap = new Map();
         jobs.forEach(job => {
-            const jobId = job.job_id.toString();
-            const parents = new Set(job.depends_on);
+            const jobId = job.id.toString();
+            const parents = new Set(job.parents);
             const children = parentToChildMap.get(jobId) || new Set();
-            const loopId = job.loop_id
+            const nodeId = job.node_id
 
             const parentsKey = Array.from(parents).sort().join(",");
             const childrenKey = Array.from(children).sort().join(",");
-            const signature =  loopId ? loopId : `${parentsKey}|${childrenKey}`;
+            const signature =  nodeId ? nodeId : `${parentsKey}|${childrenKey}`;
 
             if (!groupMap.has(signature)) {
                 groupMap.set(signature, []);
@@ -1664,8 +1664,8 @@
             groups.push({
                 id: `group_${groupIndex++}`,
                 jobs: groupJobs,
-                parents: new Set(groupJobs[0].depends_on),
-                children: parentToChildMap.get(groupJobs[0].job_id.toString()) || new Set(),
+                parents: new Set(groupJobs[0].parents),
+                children: parentToChildMap.get(groupJobs[0].id.toString()) || new Set(),
                 progress: progress,
                 nodeColor: nodeColor
             });
@@ -1727,7 +1727,7 @@
     // Simplified tooltip function
     function showTooltip(event, group) {
         const tooltip = document.getElementById('tooltip');
-        const jobIds = group.jobs.map(j => j.job_id);
+        const jobIds = group.jobs.map(j => j.id);
         const displayText = smartRangeDisplay(jobIds);
         const breakdown = getStatusBreakdown(group.jobs);
         
@@ -1781,9 +1781,9 @@
         
         // Add nodes
         filteredGroups.forEach(group => {
-            const jobIds = group.jobs.map(j => j.job_id);
+            const jobIds = group.jobs.map(j => j.id);
             const displayText = smartRangeDisplay(jobIds);
-            const groupName = group.jobs[0].group_name || "root";
+            const groupName = group.jobs[0].node_name || "root";
             const progress = group.progress;
             const nodeColor = group.nodeColor;
             
@@ -1812,7 +1812,7 @@
         // Add edges (only between visible groups)
         filteredGroups.forEach(group => {
             Array.from(group.parents).forEach(parentId => {
-                const parentGroup = filteredGroups.find(g => g.jobs.some(j => j.job_id.toString() === parentId));
+                const parentGroup = filteredGroups.find(g => g.jobs.some(j => j.id.toString() === parentId));
                 if (parentGroup && parentGroup.id !== group.id) {
                     elements.push({
                         data: {
@@ -1970,9 +1970,9 @@
                 <div style="font-size: 14px; margin-bottom: 16px;">External libraries couldn't load, showing basic view</div>
                 <div style="display: grid; gap: 12px; max-width: 600px; max-height: 400px; overflow-y: auto;">
                     ${filteredGroups.map(group => {
-                        const jobIds = group.jobs.map(j => j.job_id);
+                        const jobIds = group.jobs.map(j => j.id);
                         const displayText = smartRangeDisplay(jobIds);
-                        const groupName = group.jobs[0].group_name;
+                        const groupName = group.jobs[0].node_name;
                         const progress = group.progress;
                         return `
                             <div style="border: 1px solid var(--border-primary); border-radius: 8px; padding: 12px; background: var(--bg-secondary); cursor: pointer;" onclick="showGroupDetails({jobs: ${JSON.stringify(group.jobs).replace(/"/g, '&quot;')}, displayText: '${displayText}', groupName: '${groupName}'})">
@@ -2098,7 +2098,7 @@
             
             jobCard.innerHTML = `
                 <div class="job-header">
-                    <div class="job-id">#${job.job_id}</div>
+                    <div class="job-id">#${job.id}</div>
                     <div class="job-status ${getStatusClass(job.status)}">
                         <span class="status-icon ${getStatusIcon(job.status)}"></span>
                         ${job.status}
@@ -2111,9 +2111,9 @@
                     <div class="job-detail-item">
                         <div class="job-detail-label">Dependencies</div>
                         <div class="job-detail-value">
-                            ${job.depends_on.length > 0 ? 
+                            ${job.parents.length > 0 ? 
                                 `<div class="dependency-list">
-                                    ${job.depends_on.map(dep => `<span class="dependency-tag">#${dep}</span>`).join('')}
+                                    ${job.parents.map(dep => `<span class="dependency-tag">#${dep}</span>`).join('')}
                                 </div>` :
                                 'None'
                             }

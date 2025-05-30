@@ -132,7 +132,7 @@ class JobViewer(JobDB):
             status = job_statuses.get(str(job.id), "UNKNOWN")  # type: ignore
             status_color = self._get_status_color(status)
             print(
-                f"{job.id} [{job.group_name}]: ({status_color}{status}\033[0m): {cmd}{deps}"
+                f"{job.id} [{job.node_name}]: ({status_color}{status}\033[0m): {cmd}{deps}"
             )
 
         print("-" * border_width)
@@ -162,7 +162,7 @@ class JobViewer(JobDB):
         col_widths = [40, 10] + [20] * 6 + [80, 80]
         for group in self._group_jobs(jobs).values():
             id = self._smart_range_display([j.id for j in group])
-            group_name = group[0].group_name or "root"
+            group_name = group[0].node_name or "root"
             status = self._get_status_totals(group)
             finished = sum(
                 status[k]
@@ -256,10 +256,10 @@ class JobViewer(JobDB):
                     "job_id": job.id,
                     "status": job.status,
                     "command": job.command,
-                    "group_name": job.group_name,
+                    "group_name": job.node_name,
                     "depends_on": job.parents,
                     "preamble": job.preamble,
-                    "loop_id": job.loop_id,
+                    "loop_id": job.node_id,
                 }
             )
 
@@ -281,8 +281,8 @@ class JobViewer(JobDB):
             table_data.append(
                 [
                     job.id,
-                    job.group_name,
-                    job.loop_id or "N/A",
+                    job.node_name,
+                    job.node_id or "N/A",
                     job.command,
                     job.status,
                 ]
