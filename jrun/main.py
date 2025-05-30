@@ -11,7 +11,7 @@ def get_default_db_path():
     """Get the default database path using appdirs user data directory."""
     app_data_dir = appdirs.user_data_dir("jrun")
     Path(app_data_dir).mkdir(parents=True, exist_ok=True)
-    return str(Path(app_data_dir) / "jrun.db")
+    return str(Path(app_data_dir) / "jrun-dev.db")
 
 
 def ask_user_yes_no_question(
@@ -189,8 +189,7 @@ def main():
 
     elif args.cmd == "retry":
         jr = JobSubmitter(args.db, deptype=args.deptype)
-        job_ids = [int(job_id) for job_id in args.job_ids]
-        for job_id in job_ids:
+        for job_id in args.job_ids:
             jr.retry(job_id, force=args.force)
 
     # Show job statuses
@@ -221,7 +220,7 @@ def main():
             # If no job IDs are provided, ask for confirmation to delete the database
             ask_user_yes_no_question(
                 question="Are you sure you want to delete the database? (y/n): ",
-                on_yes=lambda: jr.delete_job(),
+                on_yes=lambda: jr.delete(),
                 on_no=lambda: print("Database deletion cancelled."),
             )
         jr.delete_job(args.job_ids, cascade=True)
@@ -229,10 +228,9 @@ def main():
     # Cancel jobs
     elif args.cmd == "cancel":
         jr = JobSubmitter(args.db)
-        job_ids = [int(job_id) for job_id in args.job_ids]
-        if len(job_ids) == 0:
+        if len(args.job_ids) == 0:
             return jr.cancel_all()
-        for job_id in job_ids:
+        for job_id in args.job_ids:
             jr.cancel(job_id)
 
     # Start web server

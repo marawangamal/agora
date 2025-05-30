@@ -1,4 +1,5 @@
 from dataclasses import asdict, dataclass, field
+import time
 from typing import Any, Dict, List, Literal, Optional, Union
 
 
@@ -23,8 +24,6 @@ class Job:
     id: str
     command: str
     preamble: str
-    created_at: str
-    updated_at: str
     node_id: Optional[str] = None
     node_name: Optional[str] = None
     parents: List[str] = field(default_factory=list)
@@ -33,6 +32,8 @@ class Job:
     status: str = "UNKNOWN"  
     slurm_log: Optional[str] = None
     slurm_err: Optional[str] = None
+    created_at: str = time.strftime("%Y-%m-%d %H:%M:%S")
+    updated_at: str = time.strftime("%Y-%m-%d %H:%M:%S")
 
 
     @property

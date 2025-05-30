@@ -33,8 +33,7 @@ class JobDB:
         conn.execute("PRAGMA foreign_keys = ON")
 
         # Create jobs table if it doesn't exist
-        cursor.execute(
-        """
+        cursor.execute("""
         CREATE TABLE IF NOT EXISTS jobs (
             id TEXT PRIMARY KEY,
             command TEXT NOT NULL,
@@ -44,7 +43,9 @@ class JobDB:
             node_id TEXT,
             node_name TEXT
         )
+        """)
 
+        cursor.execute("""
         CREATE TABLE IF NOT EXISTS deps (
             parent TEXT NOT NULL,
             child TEXT NOT NULL,
@@ -53,16 +54,16 @@ class JobDB:
             FOREIGN KEY (child) REFERENCES jobs(job_id) ON DELETE CASCADE ON UPDATE CASCADE, -- delete record if child is deleted
             UNIQUE (parent, child, dep_type)
         )
+        """)
 
+        cursor.execute("""
         CREATE VIEW IF NOT EXISTS vw_jobs AS
             SELECT
                 j.*,
                 (SELECT GROUP_CONCAT(d.child, ',') FROM deps d WHERE d.parent = j.id) AS children,
                 (SELECT GROUP_CONCAT(d2.parent, ',') FROM deps d2 WHERE d2.child = j.id) AS parents
             FROM jobs j;
-
-        """
-        )
+        """)
         conn.commit()
         conn.close()
 
@@ -192,7 +193,7 @@ class JobDB:
         return rows
 
     ############################################################################
-    #                                CRUD operations                           #
+    #                                CRUD operations (jobs)                    #
     ############################################################################
 
     def create_job(self, rec: JobInsert) -> None:
@@ -281,14 +282,40 @@ class JobDB:
         result = []
         for row in jobs:
             row_dict = dict(row)
-            row_dict["parents"] = json.loads(row_dict["parents"])
+            row_dict["parents"] = row_dict["parents"].split(',') if row_dict["parents"] else []
+            row_dict["children"] = row_dict["children"].split(',') if row_dict["children"] else []
             row_dict["status"] = job_statuses.get(
-                str(row_dict["id"]), row_dict["status"]
+                str(row_dict["id"]), "UNKNOWN"
             )
 
             result.append(Job(**row_dict))
 
         return result
+
+
+    ############################################################################
+    #                                CRUD operations (deps)                    #
+    ############################################################################
+
+
+    def upsert_deps(self, child_id: str, parent_ids: List[str], dep_type: Literal["afterok", "afterany"] = "afterok") -> None:
+        """Update dependencies for a job."""
+        with sqlite3.connect(self.db_path) as conn:
+            cur = conn.cursor()
+
+            # Delete existing dependencies for this child
+            cur.execute(
+                "DELETE FROM deps WHERE child = ?",
+                (child_id,),
+            )
+
+            # Insert new dependencies
+            for parent_id in parent_ids:
+                cur.execute(
+                    "INSERT OR IGNORE INTO deps (parent, child, dep_type) VALUES (?, ?, ?)",
+                    (parent_id, child_id, dep_type),
+                )
+            conn.commit()
 
 
     # def update_depends_on(self, new_job_id: int, old_job_id: int) -> None:
