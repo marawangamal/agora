@@ -291,6 +291,9 @@ class JobDB:
             row_dict["status"] = job_statuses.get(
                 str(row_dict["id"]), "UNKNOWN"
             )
+            # # parse #SBATCH --output= and #SBATCH --error= fields
+            # if row_dict.get("preamble"):
+            #     slurm_output =re
 
             result.append(Job(**row_dict))
 

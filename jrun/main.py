@@ -59,6 +59,12 @@ def parse_args():
         help="Filter jobs (e.g, job_id=123  or command~train)",
         default=None,
     )
+    p_status.add_argument(
+        "--cols",
+        nargs="*",
+        default=["id", "node_name", "node_id", "command", "status"],
+        help="Columns to display in the status table (default: id, node_name, node_id, command, status)",
+    )
 
     ###### jrun sbatch (pass args straight to sbatch)
     p_sbatch = sub.add_parser("sbatch", help="Pass args straight to sbatch")
@@ -195,7 +201,7 @@ def main():
     # Show job statuses
     elif args.cmd == "status":
         jr = JobViewer(args.db)
-        jr.status(args.filters)
+        jr.status(args.filters, args.cols)
 
     # Visualize job dependencies
     elif args.cmd == "viz":

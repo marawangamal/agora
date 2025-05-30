@@ -270,7 +270,7 @@ class JobViewer(JobDB):
 
         print(json.dumps(output, indent=2))
 
-    def status(self, filters: Optional[List[str]] = None) -> None:
+    def status(self, filters: Optional[List[str]] = None, cols: List[str] = ["id", "node_name", "node_id", "command", "status"]) -> None:
         """Display a simple job status table using tabulate."""
         jobs = self.get_jobs(filters=filters)
         if not jobs:
@@ -279,27 +279,13 @@ class JobViewer(JobDB):
         table_data = []
         for job in jobs:
             table_data.append(
-                [
-                    job.id,
-                    job.node_name,
-                    job.node_id or "N/A",
-                    job.command,
-                    job.status,
-                ]
+                [getattr(job, col) or 'n/a' for col in cols]
             )
-
         # Print table using tabulate
-        headers = ["ID", "GROUP", "LOOP", "COMMAND", "STATUS"]
-        col_widths = [10, 10, 80, 10]
-        # print("\n" + tabulate(table_data, headers=headers, tablefmt="simple"))
         print(
             "\n"
             + tabulate(
-                table_data, headers=headers, tablefmt="grid", maxcolwidths=col_widths
+                table_data, headers=cols, tablefmt="grid", maxcolwidths=100
             )
         )
-
-        border_width = 100
-        print("-" * border_width)
         print(self._get_footer(jobs))
-        print("=" * border_width)
