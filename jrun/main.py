@@ -11,7 +11,7 @@ def get_default_db_path():
     """Get the default database path using appdirs user data directory."""
     app_data_dir = appdirs.user_data_dir("jrun")
     Path(app_data_dir).mkdir(parents=True, exist_ok=True)
-    return str(Path(app_data_dir) / "jrun-dev.db")
+    return str(Path(app_data_dir) / "jrun.db")
 
 
 def ask_user_yes_no_question(

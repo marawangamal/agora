@@ -182,11 +182,13 @@ group:
 - [x] Job delete subgraph
 - [x] Web app
 - [x] Improve visual for loop group
+- [x] Improve dependency (make markovian)
 
 ## Planned Features
 - [ ] Update afterany (allow some parent group failures)
+- [ ] Update node color code (mixed with pending should be blue/active)
 - [ ] View job logs in the web
-- [ ] Improve dependency (make markovian)
+
 
 <!-- sacct -j 6894879 --format=JobID,WorkDir -X --parsable2 -->
 

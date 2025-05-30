@@ -13,8 +13,6 @@ from jrun._base import JobDB
 from jrun.interfaces import Job, JobInsert, Job, PGroup, PJob
 
 JOB_RE = re.compile(r"Submitted batch job (\d+)")
-# TODO: Add deps table to schema and use a view to get deps on the fly
-
 
 class JobSubmitter(JobDB):
     def __init__(self, *args, **kwargs):
@@ -33,6 +31,7 @@ class JobSubmitter(JobDB):
         job: Job,
         dry: bool = False,
         ignore_statuses: List[str] = ["PENDING", "RUNNING", "COMPLETED"],
+        prev_job_id: Optional[str] = None,
     ):
         """Submit a single job to SLURM and return the job ID.
 
@@ -45,24 +44,31 @@ class JobSubmitter(JobDB):
         if dry:
             job.command += " --dry"
 
-        # Create a temporary script file
+        # 1. Create a temporary file from script
         with tempfile.NamedTemporaryFile(mode="w", suffix=".sh", delete=False) as f:
             script_path = f.name
             f.write(job.to_script(deptype=self.deptype))
 
         try:
-            # Check if the job is already submitted
-            prev_jobs = self.get_jobs([f"command='{job.command}'"])
-            prev_job = prev_jobs[0] if prev_jobs else None
-            if prev_job and prev_job.status in ignore_statuses:
-                print(f"Job {prev_job.id} already submitted with status {prev_job.status}.")
-                return prev_job.id
+            # 2. Check for prev job
+            prev_job = None
+            if prev_job_id:  # Lookup by ID
+                prev_jobs = self.get_jobs([f"id={prev_job_id}"])
+                prev_job = prev_jobs[0] if prev_jobs else None
+            else:  # Lookup by command
+                prev_jobs = self.get_jobs([f"command='{job.command}'"])
+                prev_job = prev_jobs[0] if prev_jobs else None
+                if prev_job and prev_job.status in ignore_statuses:
+                    print(f"Job {prev_job.id} already submitted with status {prev_job.status}.")
+                    return prev_job.id
 
-            # Submit the job using sbatch
+            # 3. Submit job (sbatch)
             result = os.popen(f"sbatch {script_path}").read()
             job.id = self._parse_job_id(result)
             print(f"Submitted job with ID {job.id}")
 
+
+            # 4. Upsert job in the database
             upsert_job = JobInsert(**{
                 k: v for k, v in job.to_dict().items() if k in JobInsert.__dataclass_fields__
             })
@@ -113,7 +119,7 @@ class JobSubmitter(JobDB):
             ignore_statuses = ["COMPLETED"] if not force else []
             
             self._submit_job(
-                job, dry=False, ignore_statuses=ignore_statuses
+                job, dry=False, ignore_statuses=ignore_statuses, prev_job_id=job_id
             )
 
             # Get children -- should be resubmitted too
