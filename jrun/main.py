@@ -11,7 +11,7 @@ def get_default_db_path():
     """Get the default database path using appdirs user data directory."""
     app_data_dir = appdirs.user_data_dir("jrun")
     Path(app_data_dir).mkdir(parents=True, exist_ok=True)
-    return str(Path(app_data_dir) / "jrun.db")
+    return str(Path(app_data_dir) / "jrun-dev.db")
 
 
 def ask_user_yes_no_question(
@@ -58,6 +58,12 @@ def parse_args():
         nargs="*",
         help="Filter jobs (e.g, job_id=123  or command~train)",
         default=None,
+    )
+    p_status.add_argument(
+        "--cols",
+        nargs="*",
+        default=["id", "node_name", "node_id", "command", "status"],
+        help="Columns to display in the status table (default: id, node_name, node_id, command, status)",
     )
 
     ###### jrun sbatch (pass args straight to sbatch)
@@ -189,14 +195,13 @@ def main():
 
     elif args.cmd == "retry":
         jr = JobSubmitter(args.db, deptype=args.deptype)
-        job_ids = [int(job_id) for job_id in args.job_ids]
-        for job_id in job_ids:
+        for job_id in args.job_ids:
             jr.retry(job_id, force=args.force)
 
     # Show job statuses
     elif args.cmd == "status":
         jr = JobViewer(args.db)
-        jr.status(args.filters)
+        jr.status(args.filters, args.cols)
 
     # Visualize job dependencies
     elif args.cmd == "viz":
@@ -224,15 +229,14 @@ def main():
                 on_yes=lambda: jr.delete(),
                 on_no=lambda: print("Database deletion cancelled."),
             )
-        jr.delete(args.job_ids, cascade=True)
+        jr.delete_job(args.job_ids, cascade=True)
 
     # Cancel jobs
     elif args.cmd == "cancel":
         jr = JobSubmitter(args.db)
-        job_ids = [int(job_id) for job_id in args.job_ids]
-        if len(job_ids) == 0:
+        if len(args.job_ids) == 0:
             return jr.cancel_all()
-        for job_id in job_ids:
+        for job_id in args.job_ids:
             jr.cancel(job_id)
 
     # Start web server

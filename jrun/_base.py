@@ -1,10 +1,9 @@
-import datetime
 import json
 import os
 import sqlite3
 from typing import Any, Callable, Dict, List, Literal, Optional, Tuple, Union
 
-from jrun.interfaces import JobSpec, PGroup, PJob
+from jrun.interfaces import JobInsert, Job, PGroup, PJob
 
 
 class JobDB:
@@ -31,23 +30,40 @@ class JobDB:
         """Initialize the database if it doesn't exist."""
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
+        conn.execute("PRAGMA foreign_keys = ON")
 
         # Create jobs table if it doesn't exist
-        cursor.execute(
-            """
+        cursor.execute("""
         CREATE TABLE IF NOT EXISTS jobs (
-            job_id TEXT PRIMARY KEY,
+            id TEXT PRIMARY KEY,
             command TEXT NOT NULL,
             preamble TEXT NOT NULL,
-            group_name TEXT NOT NULL,
-            depends_on TEXT,
-            loop_id TEXT,
             created_at TEXT NOT NULL,
-            updated_at TEXT NOT NULL
+            updated_at TEXT NOT NULL,
+            node_id TEXT,
+            node_name TEXT
         )
-        """
-        )
+        """)
 
+        cursor.execute("""
+        CREATE TABLE IF NOT EXISTS deps (
+            parent TEXT NOT NULL,
+            child TEXT NOT NULL,
+            dep_type TEXT NOT NULL,
+            FOREIGN KEY (parent) REFERENCES jobs(job_id) ON DELETE CASCADE ON UPDATE CASCADE, -- delete record if parent is deleted
+            FOREIGN KEY (child) REFERENCES jobs(job_id) ON DELETE CASCADE ON UPDATE CASCADE, -- delete record if child is deleted
+            UNIQUE (parent, child, dep_type)
+        )
+        """)
+
+        cursor.execute("""
+        CREATE VIEW IF NOT EXISTS vw_jobs AS
+            SELECT
+                j.*,
+                (SELECT GROUP_CONCAT(d.child, ',') FROM deps d WHERE d.parent = j.id) AS children,
+                (SELECT GROUP_CONCAT(d2.parent, ',') FROM deps d2 WHERE d2.child = j.id) AS parents
+            FROM jobs j;
+        """)
         conn.commit()
         conn.close()
 
@@ -166,98 +182,69 @@ class JobDB:
         else:
             raise ValueError(f"Invalid filter: {filter_str}")
 
-    def insert_record(self, rec: JobSpec) -> None:
-        """Insert a new job row (fails if job_id already exists)."""
-        now = datetime.datetime.utcnow().isoformat(timespec="seconds")
 
-        # job_id: int
-        # command: str
-        # preamble: str
-        # group_name: str
-        # depends_on: List[str]
-        # status: str = "UNKNOWN"
-        # inactive_deps: List[str] = field(default_factory=list)
-        # logs_dir: str = get_default_logs_dir()
-        # loop_id: Optional[str] = None
+    def _run_query(self, query: str, params: List[Any] = []) -> List[sqlite3.Row]:
+        conn = sqlite3.connect(self.db_path)
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        cursor.execute(query, params)
+        rows = cursor.fetchall()
+        conn.close()
+        return rows
+
+    ############################################################################
+    #                                CRUD operations (jobs)                    #
+    ############################################################################
+
+    def create_job(self, rec: JobInsert) -> None:
+        """Insert a new job row (fails if job_id already exists)."""
+        values = rec.to_dict()
+        columns = ", ".join(values.keys())
+        placeholders = ", ".join(f":{k}" for k in values.keys())
 
         with sqlite3.connect(self.db_path) as conn:
             cur = conn.cursor()
-            cur.execute(
-                """
-                INSERT INTO jobs (
-                    job_id, command, preamble, group_name,
-                    depends_on, loop_id, created_at, updated_at
-                )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                """,
-                (
-                    str(rec.job_id),
-                    rec.command,
-                    rec.preamble,
-                    rec.group_name,
-                    json.dumps(rec.depends_on),  # store list as JSON text
-                    # inverse: json.loads(rec.depends_on),
-                    rec.loop_id,
-                    now,
-                    now,
-                ),
-            )
+            cur.execute(f"INSERT INTO jobs ({columns}) VALUES ({placeholders})", values)
             conn.commit()
 
-    def update_record(self, rec: JobSpec):
-        pass
+    def delete_job(self, job_id: str, cascade: bool = True, on_delete: Optional[Callable[[str], None]] = None) -> None:
 
-    def delete_record(self, job_id: Union[int, str]) -> None:
-        """Delete a job record from the database."""
+        jobs = self.get_jobs([f"id={job_id}"], ignore_status=True)
+        job = jobs[0] if jobs else None
+        if not job:
+            print(f"Job {job_id} not found, nothing to delete.")
+            return
+        
         with sqlite3.connect(self.db_path) as conn:
             cur = conn.cursor()
             cur.execute(
-                "DELETE FROM jobs WHERE job_id = ?",
+                "DELETE FROM jobs WHERE id = ?",
                 (str(job_id),),
             )
             conn.commit()
+            on_delete(job_id) if on_delete else None
 
-    def get_job_by_id(self, job_id: int) -> JobSpec:
-        """Get a job by its ID."""
-        conn = sqlite3.connect(self.db_path)
-        cursor = conn.cursor()
+        if cascade:
+            for child_id in job.children:
+                self.delete_job(child_id, cascade=True)
 
-        # Get job information
-        cursor.execute(
-            "SELECT job_id, command, preamble, group_name, depends_on, loop_id FROM jobs WHERE job_id = ?",
-            (job_id,),
-        )
-        row = cursor.fetchone()
-        conn.close()
+    def update_job(self, job_id: str, job: JobInsert) -> None:
+        """Update job fields. Only updates fields that are provided."""
+        set_clause = ", ".join(f"{k} = ?" for k in job.to_dict().keys())
+        params = list(job.to_dict().values()) + [job_id]
 
-        if row:
-            return JobSpec(
-                job_id=row[0],
-                command=row[1],
-                preamble=row[2],
-                group_name=row[3],
-                depends_on=json.loads(row[4]),
-                loop_id=row[5],
-            )
-        raise ValueError(f"Job with ID {job_id} not found in the database.")
+        query = f"UPDATE jobs SET {set_clause}, updated_at = datetime('now') WHERE id = ?"
 
-    def get_job_by_command(self, command: str) -> Optional[JobSpec]:
-        """Get a job by its command."""
-        prev_jobs = self.get_jobs()
-        for job in prev_jobs:
-            if job.command == command:
-                return job
-        return None
+        with sqlite3.connect(self.db_path) as conn:
+            cur = conn.cursor()
+            cur.execute(query, params)
+            conn.commit()
 
     def get_jobs(
         self, filters: Optional[List[str]] = None, ignore_status: bool = False
-    ) -> List[JobSpec]:
+    ) -> List[Job]:
         """Get jobs with optional filters."""
-        conn = sqlite3.connect(self.db_path)
-        cursor = conn.cursor()
-
-        # Get basic job information
-        query = "SELECT job_id, command, preamble, group_name, depends_on, loop_id FROM jobs"
+        query = "SELECT * FROM vw_jobs"
         params = []
 
         # Remove status from filters
@@ -276,18 +263,15 @@ class JobDB:
                 query += " WHERE " + " AND ".join(conditions)
 
         query += " ORDER BY created_at ASC"
-
-        cursor.execute(query, params)
-        jobs = cursor.fetchall()
+        jobs = self._run_query(query, params)
         job_ids = [job[0] for job in jobs]
 
         # Get job statuses from SLURM
         if not ignore_status:
             job_statuses = self._get_job_statuses(job_ids)
         else:
-            job_statuses = {str(job[0]): "UNKNOWN" for job in jobs}
+            job_statuses = {str(job['id']): "UNKNOWN" for job in jobs}
 
-        conn.close()
 
         # Filter out jobs based on status filter
         if status_filter:
@@ -295,74 +279,88 @@ class JobDB:
             jobs = [
                 job
                 for job in jobs
-                if job_statuses.get(str(job[0]), "UNKNOWN").lower() == value.lower()
+                if job_statuses.get(str(job['id']), "UNKNOWN").lower() == value.lower()
             ]
 
-        return [
-            JobSpec(
-                job_id=row[0],
-                command=row[1],
-                preamble=row[2],
-                group_name=row[3],
-                depends_on=json.loads(row[4]),
-                loop_id=row[5],
-                status=job_statuses.get(str(row[0]), "UNKNOWN"),
+        # Convert to JobSpec objects
+        result = []
+        for row in jobs:
+            row_dict = dict(row)
+            row_dict["parents"] = row_dict["parents"].split(',') if row_dict["parents"] else []
+            row_dict["children"] = row_dict["children"].split(',') if row_dict["children"] else []
+            row_dict["status"] = job_statuses.get(
+                str(row_dict["id"]), "UNKNOWN"
             )
-            for row in jobs
-        ]
+            # # parse #SBATCH --output= and #SBATCH --error= fields
+            # if row_dict.get("preamble"):
+            #     slurm_output =re
 
-    def update_depends_on(self, new_job_id: int, old_job_id: int) -> None:
-        """Update all jobs that depend on old_job_id to depend on new_job_id instead."""
-        conn = sqlite3.connect(self.db_path)
-        cursor = conn.cursor()
+            result.append(Job(**row_dict))
 
-        # Get all jobs with their dependencies
-        cursor.execute("SELECT job_id, depends_on FROM jobs")
-        jobs = cursor.fetchall()
+        return result
 
-        updated_count = 0
-        now = datetime.datetime.utcnow().isoformat(timespec="seconds")
 
-        for job_id, depends_on_json in jobs:
-            # Parse the JSON list (handle empty/null case)
-            depends_on = json.loads(depends_on_json) if depends_on_json else []
+    ############################################################################
+    #                                CRUD operations (deps)                    #
+    ############################################################################
 
-            # Check if this job depends on the old job ID
-            old_job_str = str(old_job_id)
-            new_job_str = str(new_job_id)
 
-            if old_job_str in depends_on:
-                # Replace old job ID with new job ID
-                updated_depends_on = [
-                    new_job_str if dep == old_job_str else dep for dep in depends_on
-                ]
+    def upsert_deps(self, child_id: str, parent_ids: List[str], dep_type: Literal["afterok", "afterany"] = "afterok") -> None:
+        """Update dependencies for a job."""
+        with sqlite3.connect(self.db_path) as conn:
+            cur = conn.cursor()
 
-                # Update the database
-                cursor.execute(
-                    "UPDATE jobs SET depends_on = ?, updated_at = ? WHERE job_id = ?",
-                    (json.dumps(updated_depends_on), now, job_id),
+            # Delete existing dependencies for this child
+            cur.execute(
+                "DELETE FROM deps WHERE child = ?",
+                (child_id,),
+            )
+
+            # Insert new dependencies
+            for parent_id in parent_ids:
+                cur.execute(
+                    "INSERT OR IGNORE INTO deps (parent, child, dep_type) VALUES (?, ?, ?)",
+                    (parent_id, child_id, dep_type),
                 )
-                updated_count += 1
-                print(f"Updated job {job_id}: dependency {old_job_id} -> {new_job_id}")
+            conn.commit()
 
-        conn.commit()
-        conn.close()
 
-        print(f"Updated dependencies for {updated_count} jobs")
+    # def update_depends_on(self, new_job_id: int, old_job_id: int) -> None:
+    #     """Update all jobs that depend on old_job_id to depend on new_job_id instead."""
+    #     conn = sqlite3.connect(self.db_path)
+    #     cursor = conn.cursor()
 
-    def get_children(self, job_id: int) -> List[JobSpec]:
-        """Get all child jobs of a given job ID."""
-        conn = sqlite3.connect(self.db_path)
-        cursor = conn.cursor()
+    #     # Get all jobs with their dependencies
+    #     cursor.execute("SELECT job_id, depends_on FROM jobs")
+    #     jobs = cursor.fetchall()
 
-        # Get all jobs with their dependencies
-        cursor.execute("SELECT job_id, depends_on FROM jobs")
-        jobs = cursor.fetchall()
+    #     updated_count = 0
+    #     now = datetime.datetime.utcnow().isoformat(timespec="seconds")
 
-        child_jobs = []
-        for job in jobs:
-            if str(job_id) in json.loads(job[1]):
-                child_jobs.append(self.get_job_by_id(job[0]))
+    #     for job_id, depends_on_json in jobs:
+    #         # Parse the JSON list (handle empty/null case)
+    #         depends_on = json.loads(depends_on_json) if depends_on_json else []
 
-        conn.close()
-        return child_jobs
+    #         # Check if this job depends on the old job ID
+    #         old_job_str = str(old_job_id)
+    #         new_job_str = str(new_job_id)
+
+    #         if old_job_str in depends_on:
+    #             # Replace old job ID with new job ID
+    #             updated_depends_on = [
+    #                 new_job_str if dep == old_job_str else dep for dep in depends_on
+    #             ]
+
+    #             # Update the database
+    #             cursor.execute(
+    #                 "UPDATE jobs SET depends_on = ?, updated_at = ? WHERE job_id = ?",
+    #                 (json.dumps(updated_depends_on), now, job_id),
+    #             )
+    #             updated_count += 1
+    #             print(f"Updated job {job_id}: dependency {old_job_id} -> {new_job_id}")
+
+    #     conn.commit()
+    #     conn.close()
+
+    #     print(f"Updated dependencies for {updated_count} jobs")
+

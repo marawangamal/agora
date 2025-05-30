@@ -10,7 +10,7 @@ from typing import Callable, Dict, List, Optional, Union
 
 import yaml
 from jrun._base import JobDB
-from jrun.interfaces import JobSpec, PGroup, PJob
+from jrun.interfaces import Job, JobInsert, Job, PGroup, PJob
 
 JOB_RE = re.compile(r"Submitted batch job (\d+)")
 # TODO: Add deps table to schema and use a view to get deps on the fly
@@ -20,22 +20,17 @@ class JobSubmitter(JobDB):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-    def _parse_job_id(self, result: str) -> int:
-        # job_id = result.split(" ")[-1].strip()
-        # if not job_id:
-        #     raise ValueError("Failed to parse job ID from sbatch output.")
-        # return job_id
-        # Typical line: "Submitted batch job 123456"
+    def _parse_job_id(self, result: str) -> str:
         m = JOB_RE.search(result)
         if m:
-            jobid = int(m.group(1))
+            jobid = m.group(1)
             return jobid
         else:
             raise RuntimeError(f"Could not parse job id from sbatch output:\n{result}")
 
-    def _submit_jobspec(
+    def _submit_job(
         self,
-        job_spec: JobSpec,
+        job: Job,
         dry: bool = False,
         ignore_statuses: List[str] = ["PENDING", "RUNNING", "COMPLETED"],
     ):
@@ -48,43 +43,45 @@ class JobSubmitter(JobDB):
         """
 
         if dry:
-            job_spec.command += " --dry"
+            job.command += " --dry"
 
         # Create a temporary script file
         with tempfile.NamedTemporaryFile(mode="w", suffix=".sh", delete=False) as f:
             script_path = f.name
-            f.write(job_spec.to_script(deptype=self.deptype))
+            f.write(job.to_script(deptype=self.deptype))
 
         try:
             # Check if the job is already submitted
-            prev_job = self.get_job_by_command(job_spec.command)
-            if prev_job:
-                if prev_job.status in ignore_statuses:
-                    print(f"Job with command '{job_spec.command}' already submitted")
-                    return prev_job.job_id
-                else:
-                    print(f"Job with command '{job_spec.command}' failed, resubmitting")
+            prev_jobs = self.get_jobs([f"command='{job.command}'"])
+            prev_job = prev_jobs[0] if prev_jobs else None
+            if prev_job and prev_job.status in ignore_statuses:
+                print(f"Job {prev_job.id} already submitted with status {prev_job.status}.")
+                return prev_job.id
 
             # Submit the job using sbatch
             result = os.popen(f"sbatch {script_path}").read()
-            job_id = self._parse_job_id(result)
-            job_spec.job_id = job_id
-            self.insert_record(JobSpec(**job_spec.to_dict()))
-            print(f"Submitted job with ID {job_id}")
+            job.id = self._parse_job_id(result)
+            print(f"Submitted job with ID {job.id}")
+
+            upsert_job = JobInsert(**{
+                k: v for k, v in job.to_dict().items() if k in JobInsert.__dataclass_fields__
+            })
 
             # clean up
             if prev_job:
-                # remove the previous job from the database
-                self.delete_record(prev_job.job_id)
-
-            # add small delay
+                print(f"Updating existing job: {prev_job.id} => {upsert_job.id}")
+                self.update_job(prev_job.id, upsert_job)
+            else:
+                print(f"Inserting new job: {upsert_job.id}")
+                self.create_job(upsert_job)
+            self.upsert_deps(upsert_job.id, job.parents)
             time.sleep(0.1)
-            return job_id
+            return job.id
         finally:
             # Clean up the temporary file
             os.unlink(script_path)
 
-    def cancel(self, job_id: int):
+    def cancel(self, job_id: str):
         """Cancel jobs with the given job IDs."""
         try:
             subprocess.run(["scancel", str(job_id)], check=True)
@@ -96,44 +93,32 @@ class JobSubmitter(JobDB):
         """Cancel all jobs in the database."""
         jobs = self.get_jobs()
         for job in jobs:
-            self.cancel(job.job_id)
+            self.cancel(job.id)
 
-    def delete(self, job_ids: Optional[List[int]] = None, cascade: bool = False):
+    def delete(self, job_ids: Optional[List[str]] = None, cascade: bool = False):
         """Delete jobs with the given job IDs."""
-        if job_ids is None:
-            # If no job IDs are provided, delete all jobs
-            job_ids = [job.job_id for job in self.get_jobs()]
+        if not job_ids:
+            print("No job IDs provided, deleting all jobs in the database.")
+            job_ids = [job.id for job in self.get_jobs(ignore_status=True)]
 
-        for job_id in job_ids:
-            self.cancel(job_id)
-            self.delete_record(job_id)
-            if cascade:
-                self.delete([c.job_id for c in self.get_children(job_id)])
+        for id in job_ids:
+            print(f"Deleting job {id}")
+            self.delete_job(id, on_delete=lambda id: self.cancel(id), cascade=cascade)
 
-    def retry(self, job_id: int, job: Optional[JobSpec] = None, force: bool = False):
+    def retry(self, job_id: str, job: Optional[Job] = None, force: bool = False):
         """Retry a job with the given job ID."""
-        if job is None:
-            job = self.get_job_by_id(job_id)
-        inactive_jobs = [j for j in self.get_jobs() if j.status == "COMPLETED"]
+        job = self.get_jobs([f"id={job_id}"])[0] if job is None else job
         if job:
-            job.inactive_deps = [
-                j.job_id for j in inactive_jobs if j.job_id in job.depends_on
-            ]
             print(f"Retrying job {job_id}")
-            ignore_statuses = ["RUNNING", "COMPLETED"] if not force else []
-            new_job_id = self._submit_jobspec(
+            ignore_statuses = ["COMPLETED"] if not force else []
+            
+            self._submit_job(
                 job, dry=False, ignore_statuses=ignore_statuses
             )
 
             # Get children -- should be resubmitted too
-            children = self.get_children(job_id)
-            for child in children:
-                child.depends_on.remove(str(job_id))
-                child.depends_on.append(str(new_job_id))
-                # delete the old job
-                # self.delete_record(child)
-                self.retry(child.job_id, child)
-
+            for child_id in job.children:
+                self.retry(child_id)
         else:
             print(f"Job {job_id} not found in the database.")
 
@@ -151,7 +136,7 @@ class JobSubmitter(JobDB):
             name: "\n".join(lines) for name, lines in cfg["preambles"].items()
         }
 
-        submit_fn = lambda job: self._submit_jobspec(job, dry=dry)
+        submit_fn = lambda job: self._submit_job(job, dry=dry)
         self.walk(
             node=self._parse_group_dict(cfg["group"]),
             preamble_map=preamble_map,
@@ -166,15 +151,15 @@ class JobSubmitter(JobDB):
         node: Union[PGroup, PJob],
         preamble_map: Dict[str, str],
         debug: bool = False,
-        depends_on: List[int] = [],
+        depends_on: List[str] = [],
         group_name: str = "",
-        submitted_jobs: List[int] = [],
-        submit_fn: Optional[Callable[[JobSpec], int]] = None,
+        submitted_jobs: List[str] = [],
+        submit_fn: Optional[Callable[[Job], str]] = None,
         group_id: Optional[str] = None,
         loop_id: Optional[str] = None,
     ):
         """Recursively walk the job tree and submit jobs."""
-        submit_fn = submit_fn if submit_fn is not None else self._submit_jobspec
+        submit_fn = submit_fn if submit_fn is not None else self._submit_job
         subgroup_id = f"{random.randint(100000, 999999)}"
         group_id = subgroup_id if group_id is None else f"{group_id}-{subgroup_id}"
 
@@ -182,14 +167,15 @@ class JobSubmitter(JobDB):
         if isinstance(node, PJob):
             # Leaf node
             # generate rand job id int
-            job_id = random.randint(100000, 999999)
-            job = JobSpec(
-                job_id=job_id,
-                group_name=group_name,
+            job_id = f"{random.randint(100000, 999999)}"
+            job = Job(
+                id=job_id,
                 command=node.command,
                 preamble=preamble_map.get(node.preamble, ""),
-                depends_on=[str(_id) for _id in depends_on],
-                loop_id=loop_id,
+                node_id=loop_id,
+                node_name=group_name,
+                parents=[str(_id) for _id in depends_on],
+
             )
             job.command = job.command.format(group_id=group_id)
             if debug:
@@ -211,15 +197,16 @@ class JobSubmitter(JobDB):
             combinations = [dict(zip(keys, v)) for v in itertools.product(*values)]
             # Iterate over the combinations
             for i, params in enumerate(combinations):
-                job_id = random.randint(100000, 999999)
+                job_id = f"{random.randint(100000, 999999)}"
                 cmd = cmd_template.format(**params, group_id=group_id)
-                job = JobSpec(
-                    job_id=job_id,
-                    group_name=group_name,
+                job = Job(
+                    id=job_id,
                     command=cmd,
                     preamble=preamble_map.get(node.preamble, ""),
-                    depends_on=[str(_id) for _id in depends_on],
-                    loop_id=loop_id,
+                    parents=[str(_id) for _id in depends_on],
+                    node_id=loop_id,
+                    node_name=group_name,
+
                 )
                 if debug:
                     print(f"\nDEBUG:\n{job.to_script(self.deptype)}\n")
@@ -249,7 +236,7 @@ class JobSubmitter(JobDB):
                     group_name=group_name_i,
                 )
                 if job_ids:
-                    depends_on.extend(job_ids)
+                    depends_on = copy.deepcopy(job_ids)
             return job_ids
 
         elif node.type == "parallel":
@@ -298,24 +285,26 @@ class JobSubmitter(JobDB):
                         loop_id=loop_id,
                     )
                     if job_ids:
-                        depends_on.extend(job_ids)
+                        # depends_on.extend(job_ids)
                         sequential_job_ids.extend(job_ids)
-            return sequential_job_ids
+                        depends_on = copy.deepcopy(job_ids)
+            return sequential_job_ids[-1:] or sequential_job_ids 
 
         return submitted_jobs
 
     def sbatch(self, args: list):
-        # Call sbatch with the provided arguments
-        result = subprocess.run(
-            ["sbatch"] + args, check=True, capture_output=True, text=True
-        ).stdout.strip()
-        job_id = self._parse_job_id(result)
-        self.insert_record(
-            JobSpec(
-                job_id=job_id,
-                group_name="sbatch",
-                command=" ".join(args),
-                preamble="",
-                depends_on=[],
-            )
-        )
+        raise NotImplementedError("The sbatch method is not implemented")
+        # # Call sbatch with the provided arguments
+        # result = subprocess.run(
+        #     ["sbatch"] + args, check=True, capture_output=True, text=True
+        # ).stdout.strip()
+        # job_id = self._parse_job_id(result)
+        # self.insert_record(
+        #     Job(
+        #         job_id=job_id,
+        #         group_name="sbatch",
+        #         command=" ".join(args),
+        #         preamble="",
+        #         depends_on=[],
+        #     )
+        # )
