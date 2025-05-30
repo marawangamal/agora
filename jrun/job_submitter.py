@@ -284,7 +284,7 @@ class JobSubmitter(JobDB):
                         # depends_on.extend(job_ids)
                         sequential_job_ids.extend(job_ids)
                         depends_on = copy.deepcopy(job_ids)
-            return sequential_job_ids
+            return sequential_job_ids[-1:] or sequential_job_ids 
 
         return submitted_jobs
 

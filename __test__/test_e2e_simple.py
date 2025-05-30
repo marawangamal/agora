@@ -145,497 +145,496 @@ class TestJrunSimple(unittest.TestCase):
 
         print("Test completed successfully!")
 
-    # @patch("os.popen")
-    # def test_nested_workflow(self, mock_popen):
-    #     """Test that jobs are submitted correctly."""
+    @patch("os.popen")
+    def test_nested_workflow(self, mock_popen):
+        """Test that jobs are submitted correctly."""
 
-    #     ##### Setup mocks
-    #     mock_popen.side_effect = self.get_popen_mock_fn()
+        ##### Setup mocks
+        mock_popen.side_effect = self.get_popen_mock_fn()
 
-    #     ##### Setup test
-    #     viewer = JobViewer(self.db_path)
-    #     submitter = JobSubmitter(self.db_path)
-    #     root = {
-    #         "group": {
-    #             "name": "test-group-nested",
-    #             "type": "sequential",
-    #             "jobs": [
-    #                 {
-    #                     "group": {
-    #                         "type": "parallel",
-    #                         "jobs": [
-    #                             {
-    #                                 "job": {
-    #                                     "preamble": "base",
-    #                                     "command": "echo 'First job'",
-    #                                 }
-    #                             },
-    #                             {
-    #                                 "job": {
-    #                                     "preamble": "gpu",
-    #                                     "command": "echo 'Second job'",
-    #                                 }
-    #                             },
-    #                         ],
-    #                     }
-    #                 },
-    #                 {
-    #                     "job": {
-    #                         "preamble": "gpu",
-    #                         "command": "echo 'Third job'",
-    #                     }
-    #                 },
-    #             ],
-    #         }
-    #     }
-    #     preamble_map = {
-    #         "base": "\n".join(
-    #             [
-    #                 "#!/bin/bash",
-    #                 "#SBATCH --partition=debug",
-    #                 "#SBATCH --output=test-%j.out",
-    #                 "#SBATCH --error=test-%j.err",
-    #             ]
-    #         ),
-    #         "gpu": "\n".join(
-    #             [
-    #                 "#SBATCH --gres=gpu:1",
-    #                 "#SBATCH --mem=8G",
-    #             ]
-    #         ),
-    #     }
+        ##### Setup test
+        viewer = JobViewer(self.db_path)
+        submitter = JobSubmitter(self.db_path)
+        root = {
+            "group": {
+                "name": "test-group-nested",
+                "type": "sequential",
+                "jobs": [
+                    {
+                        "group": {
+                            "type": "parallel",
+                            "jobs": [
+                                {
+                                    "job": {
+                                        "preamble": "base",
+                                        "command": "echo 'First job'",
+                                    }
+                                },
+                                {
+                                    "job": {
+                                        "preamble": "gpu",
+                                        "command": "echo 'Second job'",
+                                    }
+                                },
+                            ],
+                        }
+                    },
+                    {
+                        "job": {
+                            "preamble": "gpu",
+                            "command": "echo 'Third job'",
+                        }
+                    },
+                ],
+            }
+        }
+        preamble_map = {
+            "base": "\n".join(
+                [
+                    "#!/bin/bash",
+                    "#SBATCH --partition=debug",
+                    "#SBATCH --output=test-%j.out",
+                    "#SBATCH --error=test-%j.err",
+                ]
+            ),
+            "gpu": "\n".join(
+                [
+                    "#SBATCH --gres=gpu:1",
+                    "#SBATCH --mem=8G",
+                ]
+            ),
+        }
 
-    #     ##### Submit jobs
-    #     submitter.walk(
-    #         node=submitter._parse_group_dict(root["group"]),
-    #         group_name=root["group"]["name"],
-    #         preamble_map=preamble_map,
-    #         depends_on=[],
-    #         submitted_jobs=[],
-    #     )
+        ##### Submit jobs
+        submitter.walk(
+            node=submitter._parse_group_dict(root["group"]),
+            group_name=root["group"]["name"],
+            preamble_map=preamble_map,
+            depends_on=[],
+            submitted_jobs=[],
+        )
 
-    #     ##### Run tests
-    #     # Verify submission
-    #     jobs = viewer.get_jobs()
-    #     job_ids_list = [job.id for job in jobs]
-    #     self.assertIn("12345", job_ids_list)
-    #     self.assertIn("12346", job_ids_list)
-    #     self.assertIn("12347", job_ids_list)
+        ##### Run tests
+        # Verify submission
+        jobs = viewer.get_jobs()
+        job_ids_list = [job.id for job in jobs]
+        self.assertIn("12345", job_ids_list)
+        self.assertIn("12346", job_ids_list)
+        self.assertIn("12347", job_ids_list)
 
-    #     # Verify dependencies
-    #     self.assertIn("12345", jobs[2].parents)
-    #     self.assertIn("12346", jobs[2].parents)
+        # Verify dependencies
+        self.assertIn("12345", jobs[2].parents)
+        self.assertIn("12346", jobs[2].parents)
 
-    # @patch("os.popen")
-    # def test_sweep_workflow(self, mock_popen):
-    #     """Test that jobs are submitted correctly."""
+    @patch("os.popen")
+    def test_sweep_workflow(self, mock_popen):
+        """Test that jobs are submitted correctly."""
 
-    #     ##### Setup mocks
-    #     mock_popen.side_effect = self.get_popen_mock_fn()
-    #     viewer = JobViewer(self.db_path)
-    #     submitter = JobSubmitter(self.db_path)
-    #     root = {
-    #         "group": {
-    #             "name": "test-group-nested",
-    #             "type": "sequential",
-    #             "jobs": [
-    #                 {
-    #                     "group": {
-    #                         "type": "sweep",
-    #                         "sweep": {
-    #                             "param1": [1, 2],
-    #                             "param2": ["a", "b"],
-    #                         },
-    #                         "sweep_template": "echo First job with param1={param1} and param2={param2}",
-    #                     }
-    #                 },
-    #             ],
-    #         }
-    #     }
-    #     preamble_map = {
-    #         "base": "\n".join(
-    #             [
-    #                 "#!/bin/bash",
-    #                 "#SBATCH --partition=debug",
-    #                 "#SBATCH --output=test-%j.out",
-    #                 "#SBATCH --error=test-%j.err",
-    #             ]
-    #         ),
-    #         "gpu": "\n".join(
-    #             [
-    #                 "#SBATCH --gres=gpu:1",
-    #                 "#SBATCH --mem=8G",
-    #             ]
-    #         ),
-    #     }
+        ##### Setup mocks
+        mock_popen.side_effect = self.get_popen_mock_fn()
+        viewer = JobViewer(self.db_path)
+        submitter = JobSubmitter(self.db_path)
+        root = {
+            "group": {
+                "name": "test-group-nested",
+                "type": "sequential",
+                "jobs": [
+                    {
+                        "group": {
+                            "type": "sweep",
+                            "sweep": {
+                                "param1": [1, 2],
+                                "param2": ["a", "b"],
+                            },
+                            "sweep_template": "echo First job with param1={param1} and param2={param2}",
+                        }
+                    },
+                ],
+            }
+        }
+        preamble_map = {
+            "base": "\n".join(
+                [
+                    "#!/bin/bash",
+                    "#SBATCH --partition=debug",
+                    "#SBATCH --output=test-%j.out",
+                    "#SBATCH --error=test-%j.err",
+                ]
+            ),
+            "gpu": "\n".join(
+                [
+                    "#SBATCH --gres=gpu:1",
+                    "#SBATCH --mem=8G",
+                ]
+            ),
+        }
 
-    #     submitter.walk(
-    #         node=submitter._parse_group_dict(root["group"]),
-    #         group_name=root["group"]["name"],
-    #         preamble_map=preamble_map,
-    #     )
+        submitter.walk(
+            node=submitter._parse_group_dict(root["group"]),
+            group_name=root["group"]["name"],
+            preamble_map=preamble_map,
+        )
 
-    #     # Verify submission
-    #     jobs = viewer.get_jobs()
-    #     job_ids_list = [job.id for job in jobs]
-    #     self.assertIn("12345", job_ids_list)
-    #     self.assertIn("12346", job_ids_list)
-    #     self.assertIn("12347", job_ids_list)
-    #     self.assertIn("12348", job_ids_list)
+        # Verify submission
+        jobs = viewer.get_jobs()
+        job_ids_list = [job.id for job in jobs]
+        self.assertIn("12345", job_ids_list)
+        self.assertIn("12346", job_ids_list)
+        self.assertIn("12347", job_ids_list)
+        self.assertIn("12348", job_ids_list)
 
-    # @patch("os.popen")
-    # def test_nested_seqs_workflow(self, mock_popen):
-    #     """Test that jobs are submitted correctly."""
+    @patch("os.popen")
+    def test_nested_seqs_workflow(self, mock_popen):
+        """Test that jobs are submitted correctly."""
 
-    #     ##### Setup mocks
-    #     mock_popen.side_effect = self.get_popen_mock_fn()
-    #     viewer = JobViewer(self.db_path)
-    #     submitter = JobSubmitter(self.db_path)
-    #     root = {
-    #         "group": {
-    #             "name": "test-group-nested",
-    #             "type": "sequential",
-    #             "jobs": [
-    #                 {
-    #                     "group": {
-    #                         "type": "sequential",
-    #                         "jobs": [
-    #                             {
-    #                                 "job": {
-    #                                     "preamble": "base",
-    #                                     "command": "echo 'First job'",
-    #                                 }
-    #                             }
-    #                         ],
-    #                     },
-    #                 },
-    #                 {
-    #                     "group": {
-    #                         "type": "sequential",
-    #                         "jobs": [
-    #                             {
-    #                                 "job": {
-    #                                     "preamble": "base",
-    #                                     "command": "echo 'Second job'",
-    #                                 },
-    #                             },
-    #                             {
-    #                                 "job": {
-    #                                     "preamble": "base",
-    #                                     "command": "echo 'Third job'",
-    #                                 },
-    #                             },
-    #                         ],
-    #                     },
-    #                 },
-    #             ],
-    #         }
-    #     }
+        ##### Setup mocks
+        mock_popen.side_effect = self.get_popen_mock_fn()
+        viewer = JobViewer(self.db_path)
+        submitter = JobSubmitter(self.db_path)
+        root = {
+            "group": {
+                "name": "test-group-nested",
+                "type": "sequential",
+                "jobs": [
+                    {
+                        "group": {
+                            "type": "sequential",
+                            "jobs": [
+                                {
+                                    "job": {
+                                        "preamble": "base",
+                                        "command": "echo 'First job'",
+                                    }
+                                }
+                            ],
+                        },
+                    },
+                    {
+                        "group": {
+                            "type": "sequential",
+                            "jobs": [
+                                {
+                                    "job": {
+                                        "preamble": "base",
+                                        "command": "echo 'Second job'",
+                                    },
+                                },
+                                {
+                                    "job": {
+                                        "preamble": "base",
+                                        "command": "echo 'Third job'",
+                                    },
+                                },
+                            ],
+                        },
+                    },
+                ],
+            }
+        }
 
-    #     submitter.walk(
-    #         node=submitter._parse_group_dict(root["group"]),
-    #         group_name=root["group"]["name"],
-    #         preamble_map=self.preamble_map,
-    #         depends_on=[],
-    #         submitted_jobs=[],
-    #     )
+        submitter.walk(
+            node=submitter._parse_group_dict(root["group"]),
+            group_name=root["group"]["name"],
+            preamble_map=self.preamble_map,
+            depends_on=[],
+            submitted_jobs=[],
+        )
 
-    #     # Verify submission
-    #     jobs = viewer.get_jobs()
-    #     job_ids_list = [job.id for job in jobs]
-    #     self.assertIn("12345", job_ids_list)
-    #     self.assertIn("12346", job_ids_list)
+        # Verify submission
+        jobs = viewer.get_jobs()
+        job_ids_list = [job.id for job in jobs]
+        self.assertIn("12345", job_ids_list)
+        self.assertIn("12346", job_ids_list)
 
-    #     # Verify dependencies
-    #     self.assertIn("12345", jobs[1].parents)
-    #     self.assertIn("12345", jobs[2].parents)
-    #     self.assertIn("12346", jobs[2].parents)
+        # Verify dependencies
+        self.assertIn("12345", jobs[1].parents)
+        self.assertIn("12346", jobs[2].parents)
 
-    # @patch("os.popen")
-    # def test_groupid_workflow(self, mock_popen):
-    #     """Test that jobs are submitted correctly."""
+    @patch("os.popen")
+    def test_groupid_workflow(self, mock_popen):
+        """Test that jobs are submitted correctly."""
 
-    #     ##### Setup mocks
-    #     mock_popen.side_effect = self.get_popen_mock_fn()
-    #     viewer = JobViewer(self.db_path)
-    #     submitter = JobSubmitter(self.db_path)
-    #     root = {
-    #         "group": {
-    #             "name": "test-group-nested",
-    #             "type": "sequential",
-    #             "jobs": [
-    #                 {
-    #                     "job": {
-    #                         "preamble": "base",
-    #                         "command": "echo 'First job'",
-    #                     },
-    #                 },
-    #                 {
-    #                     "job": {
-    #                         "preamble": "base",
-    #                         "command": "echo 'Second job'",
-    #                     },
-    #                 },
-    #             ],
-    #         }
-    #     }
+        ##### Setup mocks
+        mock_popen.side_effect = self.get_popen_mock_fn()
+        viewer = JobViewer(self.db_path)
+        submitter = JobSubmitter(self.db_path)
+        root = {
+            "group": {
+                "name": "test-group-nested",
+                "type": "sequential",
+                "jobs": [
+                    {
+                        "job": {
+                            "preamble": "base",
+                            "command": "echo 'First job'",
+                        },
+                    },
+                    {
+                        "job": {
+                            "preamble": "base",
+                            "command": "echo 'Second job'",
+                        },
+                    },
+                ],
+            }
+        }
 
-    #     def submit_fn(*args, **kwargs):
-    #         return submitter._submit_job(*args, **kwargs, dry=True)
+        def submit_fn(*args, **kwargs):
+            return submitter._submit_job(*args, **kwargs, dry=True)
 
-    #     submitter.walk(
-    #         node=submitter._parse_group_dict(root["group"]),
-    #         group_name=root["group"]["name"],
-    #         preamble_map=self.preamble_map,
-    #         depends_on=[],
-    #         submitted_jobs=[],
-    #         submit_fn=submit_fn,
-    #     )
+        submitter.walk(
+            node=submitter._parse_group_dict(root["group"]),
+            group_name=root["group"]["name"],
+            preamble_map=self.preamble_map,
+            depends_on=[],
+            submitted_jobs=[],
+            submit_fn=submit_fn,
+        )
 
-    #     # Verify submission
-    #     jobs = viewer.get_jobs()
-    #     self.assertIn("--dry", jobs[0].command)
+        # Verify submission
+        jobs = viewer.get_jobs()
+        self.assertIn("--dry", jobs[0].command)
 
-    # @patch("os.popen")
-    # def test_dryrun_workflow(self, mock_popen):
-    #     """Test that jobs are submitted correctly."""
+    @patch("os.popen")
+    def test_dryrun_workflow(self, mock_popen):
+        """Test that jobs are submitted correctly."""
 
-    #     ##### Setup mocks
-    #     mock_popen.side_effect = self.get_popen_mock_fn()
-    #     viewer = JobViewer(self.db_path)
-    #     submitter = JobSubmitter(self.db_path)
-    #     root = {
-    #         "group": {
-    #             "name": "test-group-nested",
-    #             "type": "sequential",
-    #             "jobs": [
-    #                 {
-    #                     "group": {
-    #                         "type": "parallel",
-    #                         "jobs": [
-    #                             {
-    #                                 "job": {
-    #                                     "preamble": "base",
-    #                                     "command": "echo 'First job' --group_id {group_id}",
-    #                                 }
-    #                             },
-    #                             {
-    #                                 "job": {
-    #                                     "preamble": "gpu",
-    #                                     "command": "echo 'Second job' --group_id {group_id}",
-    #                                 }
-    #                             },
-    #                         ],
-    #                     }
-    #                 },
-    #                 {
-    #                     "job": {
-    #                         "preamble": "gpu",
-    #                         "command": "echo 'Third job' --group_id {group_id}",
-    #                     }
-    #                 },
-    #             ],
-    #         }
-    #     }
+        ##### Setup mocks
+        mock_popen.side_effect = self.get_popen_mock_fn()
+        viewer = JobViewer(self.db_path)
+        submitter = JobSubmitter(self.db_path)
+        root = {
+            "group": {
+                "name": "test-group-nested",
+                "type": "sequential",
+                "jobs": [
+                    {
+                        "group": {
+                            "type": "parallel",
+                            "jobs": [
+                                {
+                                    "job": {
+                                        "preamble": "base",
+                                        "command": "echo 'First job' --group_id {group_id}",
+                                    }
+                                },
+                                {
+                                    "job": {
+                                        "preamble": "gpu",
+                                        "command": "echo 'Second job' --group_id {group_id}",
+                                    }
+                                },
+                            ],
+                        }
+                    },
+                    {
+                        "job": {
+                            "preamble": "gpu",
+                            "command": "echo 'Third job' --group_id {group_id}",
+                        }
+                    },
+                ],
+            }
+        }
 
-    #     submitter.walk(
-    #         node=submitter._parse_group_dict(root["group"]),
-    #         group_name=root["group"]["name"],
-    #         preamble_map=self.preamble_map,
-    #         depends_on=[],
-    #         submitted_jobs=[],
-    #     )
+        submitter.walk(
+            node=submitter._parse_group_dict(root["group"]),
+            group_name=root["group"]["name"],
+            preamble_map=self.preamble_map,
+            depends_on=[],
+            submitted_jobs=[],
+        )
 
-    #     # Verify submission
-    #     jobs = viewer.get_jobs()
-    #     group_id_first = jobs[0].command.split("--group_id ")[1].split("-")[0]
-    #     group_id_third = jobs[2].command.split("--group_id ")[1].split("-")[0]
-    #     self.assertEqual(
-    #         group_id_third,
-    #         group_id_first,
-    #     )
+        # Verify submission
+        jobs = viewer.get_jobs()
+        group_id_first = jobs[0].command.split("--group_id ")[1].split("-")[0]
+        group_id_third = jobs[2].command.split("--group_id ")[1].split("-")[0]
+        self.assertEqual(
+            group_id_third,
+            group_id_first,
+        )
 
-    # @patch("os.popen")
-    # def test_groupname_workflow(self, mock_popen):
-    #     """Test that jobs are submitted correctly."""
+    @patch("os.popen")
+    def test_groupname_workflow(self, mock_popen):
+        """Test that jobs are submitted correctly."""
 
-    #     ##### Setup mocks
-    #     mock_popen.side_effect = self.get_popen_mock_fn()
-    #     viewer = JobViewer(self.db_path)
-    #     submitter = JobSubmitter(self.db_path)
-    #     root = {
-    #         "group": {
-    #             "name": "a",
-    #             "type": "sequential",
-    #             "jobs": [
-    #                 {
-    #                     "group": {
-    #                         "name": "b",
-    #                         "type": "parallel",
-    #                         "jobs": [
-    #                             {
-    #                                 "job": {
-    #                                     "preamble": "base",
-    #                                     "command": "echo 'First job' --group_id {group_id}",
-    #                                 }
-    #                             },
-    #                         ],
-    #                     }
-    #                 },
-    #                 {
-    #                     "group": {
-    #                         "type": "parallel",
-    #                         "jobs": [
-    #                             {
-    #                                 "job": {
-    #                                     "preamble": "gpu",
-    #                                     "command": "echo 'Second job' --group_id {group_id}",
-    #                                 }
-    #                             },
-    #                         ],
-    #                     }
-    #                 },
-    #                 {
-    #                     "job": {
-    #                         "preamble": "gpu",
-    #                         "command": "echo 'Third job' --group_id {group_id}",
-    #                         "name": "c",
-    #                     }
-    #                 },
-    #             ],
-    #         }
-    #     }
+        ##### Setup mocks
+        mock_popen.side_effect = self.get_popen_mock_fn()
+        viewer = JobViewer(self.db_path)
+        submitter = JobSubmitter(self.db_path)
+        root = {
+            "group": {
+                "name": "a",
+                "type": "sequential",
+                "jobs": [
+                    {
+                        "group": {
+                            "name": "b",
+                            "type": "parallel",
+                            "jobs": [
+                                {
+                                    "job": {
+                                        "preamble": "base",
+                                        "command": "echo 'First job' --group_id {group_id}",
+                                    }
+                                },
+                            ],
+                        }
+                    },
+                    {
+                        "group": {
+                            "type": "parallel",
+                            "jobs": [
+                                {
+                                    "job": {
+                                        "preamble": "gpu",
+                                        "command": "echo 'Second job' --group_id {group_id}",
+                                    }
+                                },
+                            ],
+                        }
+                    },
+                    {
+                        "job": {
+                            "preamble": "gpu",
+                            "command": "echo 'Third job' --group_id {group_id}",
+                            "name": "c",
+                        }
+                    },
+                ],
+            }
+        }
 
-    #     submitter.walk(
-    #         node=submitter._parse_group_dict(root["group"]),
-    #         group_name=root["group"]["name"],
-    #         preamble_map=self.preamble_map,
-    #         depends_on=[],
-    #         submitted_jobs=[],
-    #     )
+        submitter.walk(
+            node=submitter._parse_group_dict(root["group"]),
+            group_name=root["group"]["name"],
+            preamble_map=self.preamble_map,
+            depends_on=[],
+            submitted_jobs=[],
+        )
 
-    #     # Verify submission
-    #     jobs = viewer.get_jobs()
-    #     for job in jobs:
-    #         if job.command.startswith("echo 'First job'"):
-    #             self.assertEqual(job.node_name, "a:b")
-    #         elif job.command.startswith("echo 'Second job'"):
-    #             self.assertEqual(job.node_name, "a")
-    #         elif job.command.startswith("echo 'Third job'"):
-    #             self.assertEqual(job.node_name, "a:c")
+        # Verify submission
+        jobs = viewer.get_jobs()
+        for job in jobs:
+            if job.command.startswith("echo 'First job'"):
+                self.assertEqual(job.node_name, "a:b")
+            elif job.command.startswith("echo 'Second job'"):
+                self.assertEqual(job.node_name, "a")
+            elif job.command.startswith("echo 'Third job'"):
+                self.assertEqual(job.node_name, "a:c")
 
-    # @patch("os.popen")
-    # def test_nested_loop_workflow(self, mock_popen):
-    #     """Test that jobs are submitted correctly."""
+    @patch("os.popen")
+    def test_nested_loop_workflow(self, mock_popen):
+        """Test that jobs are submitted correctly."""
 
-    #     ##### Setup mocks
-    #     mock_popen.side_effect = self.get_popen_mock_fn()
-    #     viewer = JobViewer(self.db_path)
-    #     submitter = JobSubmitter(self.db_path)
-    #     root = {
-    #         "group": {
-    #             "name": "test-group-loop",
-    #             "type": "loop",
-    #             "loop_count": 2,
-    #             "jobs": [
-    #                 {
-    #                     "job": {
-    #                         "preamble": "gpu",
-    #                         "command": "echo 'loop job' --group_id {group_id}",
-    #                     }
-    #                 },
-    #             ],
-    #         }
-    #     }
+        ##### Setup mocks
+        mock_popen.side_effect = self.get_popen_mock_fn()
+        viewer = JobViewer(self.db_path)
+        submitter = JobSubmitter(self.db_path)
+        root = {
+            "group": {
+                "name": "test-group-loop",
+                "type": "loop",
+                "loop_count": 2,
+                "jobs": [
+                    {
+                        "job": {
+                            "preamble": "gpu",
+                            "command": "echo 'loop job' --group_id {group_id}",
+                        }
+                    },
+                ],
+            }
+        }
 
-    #     submitter.walk(
-    #         node=submitter._parse_group_dict(root["group"]),
-    #         group_name=root["group"]["name"],
-    #         preamble_map=self.preamble_map,
-    #         depends_on=[],
-    #         submitted_jobs=[],
-    #     )
+        submitter.walk(
+            node=submitter._parse_group_dict(root["group"]),
+            group_name=root["group"]["name"],
+            preamble_map=self.preamble_map,
+            depends_on=[],
+            submitted_jobs=[],
+        )
 
-    #     # Verify submission
-    #     jobs = viewer.get_jobs()
-    #     self.assertEqual(len(jobs), 2)
+        # Verify submission
+        jobs = viewer.get_jobs()
+        self.assertEqual(len(jobs), 2)
 
-    # @patch("os.popen")
-    # def test_loop_workflow(self, mock_popen):
-    #     """Test that jobs are submitted correctly."""
+    @patch("os.popen")
+    def test_loop_workflow(self, mock_popen):
+        """Test that jobs are submitted correctly."""
 
-    #     ##### Setup mocks
-    #     mock_popen.side_effect = self.get_popen_mock_fn()
-    #     viewer = JobViewer(self.db_path)
-    #     submitter = JobSubmitter(self.db_path)
-    #     root = {
-    #         "group": {
-    #             "name": "test-group-loop-root",
-    #             "type": "sequential",
-    #             "jobs": [
-    #                 {
-    #                     "group": {
-    #                         "type": "loop",
-    #                         "loop_count": 2,
-    #                         "jobs": [
-    #                             {
-    #                                 "job": {
-    #                                     "preamble": "gpu",
-    #                                     "command": "echo 'first loop' --group_id {group_id}",
-    #                                 }
-    #                             },
-    #                         ],
-    #                     }
-    #                 },
-    #                 {
-    #                     "group": {
-    #                         "type": "loop",
-    #                         "loop_count": 2,
-    #                         "jobs": [
-    #                             {
-    #                                 "job": {
-    #                                     "preamble": "gpu",
-    #                                     "command": "echo 'second loop' --group_id {group_id}",
-    #                                 }
-    #                             },
-    #                         ],
-    #                     }
-    #                 },
-    #             ],
-    #         },
-    #     }
+        ##### Setup mocks
+        mock_popen.side_effect = self.get_popen_mock_fn()
+        viewer = JobViewer(self.db_path)
+        submitter = JobSubmitter(self.db_path)
+        root = {
+            "group": {
+                "name": "test-group-loop-root",
+                "type": "sequential",
+                "jobs": [
+                    {
+                        "group": {
+                            "type": "loop",
+                            "loop_count": 2,
+                            "jobs": [
+                                {
+                                    "job": {
+                                        "preamble": "gpu",
+                                        "command": "echo 'first loop' --group_id {group_id}",
+                                    }
+                                },
+                            ],
+                        }
+                    },
+                    {
+                        "group": {
+                            "type": "loop",
+                            "loop_count": 2,
+                            "jobs": [
+                                {
+                                    "job": {
+                                        "preamble": "gpu",
+                                        "command": "echo 'second loop' --group_id {group_id}",
+                                    }
+                                },
+                            ],
+                        }
+                    },
+                ],
+            },
+        }
 
-    #     submitter.walk(
-    #         node=submitter._parse_group_dict(root["group"]),
-    #         group_name=root["group"]["name"],
-    #         preamble_map=self.preamble_map,
-    #         depends_on=[],
-    #         submitted_jobs=[],
-    #     )
+        submitter.walk(
+            node=submitter._parse_group_dict(root["group"]),
+            group_name=root["group"]["name"],
+            preamble_map=self.preamble_map,
+            depends_on=[],
+            submitted_jobs=[],
+        )
 
-    #     # Verify submission
-    #     jobs = viewer.get_jobs()
-    #     self.assertEqual(len(jobs), 4)
-    #     job_ids_list = [job.id for job in jobs]
-    #     for i in range(len(job_ids_list)):
-    #         self.assertEqual(
-    #             " ".join(jobs[i].parents),
-    #             " ".join([str(j) for j in job_ids_list[:i]]),
-    #         )
+        # Verify submission
+        jobs = viewer.get_jobs()
+        self.assertEqual(len(jobs), 4)
+        job_ids_list = [job.id for job in jobs]
+        for i in range(1, len(job_ids_list)):
+            self.assertEqual(
+                " ".join(jobs[i].parents),
+                " ".join([str(j) for j in job_ids_list[i-1:i]]),
+            )
 
-    #     # assert first two and second two have diff loop_ids
-    #     for i in range(2):
-    #         self.assertNotEqual(
-    #             jobs[i].node_id,
-    #             jobs[i + 2].node_id,
-    #             f"Loop IDs should be different for job {i} and {i + 2}",
-    #         )
-    #     # assert first two have same loop_id
-    #     self.assertEqual(
-    #         jobs[0].node_id,
-    #         jobs[1].node_id,
-    #         f"Loop IDs should be the same for job {i} and {i + 1}",
-    #     )
+        # assert first two and second two have diff loop_ids
+        for i in range(2):
+            self.assertNotEqual(
+                jobs[i].node_id,
+                jobs[i + 2].node_id,
+                f"Loop IDs should be different for job {i} and {i + 2}",
+            )
+        # assert first two have same loop_id
+        self.assertEqual(
+            jobs[0].node_id,
+            jobs[1].node_id,
+            f"Loop IDs should be the same for job {i} and {i + 1}",
+        )
 
     # @patch("os.popen")
     # def test_sbatch_args(self, mock_popen):
