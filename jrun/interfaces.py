@@ -30,10 +30,12 @@ class Job:
     children: List[str] = field(default_factory=list)
     # Fields not in vw_jobs
     status: str = "UNKNOWN"  
-    slurm_log: Optional[str] = None
+    slurm_out: Optional[str] = None
     slurm_err: Optional[str] = None
     created_at: str = time.strftime("%Y-%m-%d %H:%M:%S")
     updated_at: str = time.strftime("%Y-%m-%d %H:%M:%S")
+    start_time: Optional[str] = None
+    end_time: Optional[str] = None
 
 
     @property

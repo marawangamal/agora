@@ -1,5 +1,7 @@
-import json
+
 import os
+import os.path as osp
+import re
 import sqlite3
 from typing import Any, Callable, Dict, List, Literal, Optional, Tuple, Union
 
@@ -67,79 +69,87 @@ class JobDB:
         conn.commit()
         conn.close()
 
+    # @staticmethod
+    # def _get_job_statuses(
+    #     job_ids: list, on_add_status: Optional[Callable[[str], str]] = None
+    # ) -> Dict[str, str]:
+    #     """Get the status of a list of job IDs."""
+
+    #     def fmt_job_id(job_id: Union[str, int, float]):
+    #         """Get the job ID as a string."""
+    #         # Could be a NaN
+    #         if isinstance(job_id, float) and job_id != job_id:
+    #             return "NaN"
+    #         else:
+    #             return str(job_id)
+
+    #     statuses = {}
+    #     formatted_job_ids = [fmt_job_id(job_id) for job_id in job_ids]
+
+    #     if not formatted_job_ids:
+    #         return statuses
+
+    #     try:
+    #         # Get all job statuses and reasons in one call
+    #         job_list = ",".join(formatted_job_ids)
+    #         out = os.popen(
+    #             f"squeue -j {job_list} --format='%i %T %r' --noheader"
+    #         ).read()
+
+    #         # Parse squeue output
+    #         for line in out.strip().split("\n"):
+    #             if line.strip():
+    #                 parts = line.strip().split()
+    #                 if len(parts) >= 2:
+    #                     job_id = parts[0]
+    #                     status = parts[1]
+    #                     reason = " ".join(parts[2:]) if len(parts) > 2 else ""
+
+    #                     # Convert PENDING with DependencyNeverSatisfied to BLOCKED
+    #                     if status == "PENDING" and "DependencyNeverSatisfied" in reason:
+    #                         status = "BLOCKED"
+
+    #                     statuses[job_id] = (
+    #                         on_add_status(status) if on_add_status else status
+    #                     )
+
+    #         # For jobs not found in squeue (completed, failed, etc), fall back to sacct
+    #         missing_jobs = set(formatted_job_ids) - set(statuses.keys())
+    #         for job_id in missing_jobs:
+    #             try:
+    #                 out = os.popen(
+    #                     f"sacct -j {job_id} --format state --noheader"
+    #                 ).read()
+    #                 status = out.strip().split("\n")[0].strip()
+    #                 statuses[job_id] = (
+    #                     on_add_status(status) if on_add_status else status
+    #                 )
+    #             except:
+    #                 statuses[job_id] = "UNKNOWN"
+
+    #     except:
+    #         # Fallback to individual sacct calls if squeue fails
+    #         for job_id in formatted_job_ids:
+    #             try:
+    #                 out = os.popen(
+    #                     f"sacct -j {job_id} --format state --noheader"
+    #                 ).read()
+    #                 status = out.strip().split("\n")[0].strip()
+    #                 statuses[job_id] = (
+    #                     on_add_status(status) if on_add_status else status
+    #                 )
+    #             except:
+    #                 statuses[job_id] = "UNKNOWN"
+
+    #     return statuses
+
     @staticmethod
-    def _get_job_statuses(
-        job_ids: list, on_add_status: Optional[Callable[[str], str]] = None
-    ) -> Dict[str, str]:
-        """Get the status of a list of job IDs."""
+    def _get_job_state(job_ids: list) -> Dict[str, Dict[str, str]]:
+        job_list = ",".join(str(j) for j in job_ids)
+        output = os.popen(f"sacct -j {job_list} --format jobid,state,start,end,workdir --noheader --parsable2").read()
+        return {parts[0]: {"status": parts[1], "start": parts[2], "end": parts[3], "workdir": parts[4]}
+                for line in output.strip().split("\n") if (parts := line.split("|")) and len(parts) >= 4}
 
-        def fmt_job_id(job_id: Union[str, int, float]):
-            """Get the job ID as a string."""
-            # Could be a NaN
-            if isinstance(job_id, float) and job_id != job_id:
-                return "NaN"
-            else:
-                return str(job_id)
-
-        statuses = {}
-        formatted_job_ids = [fmt_job_id(job_id) for job_id in job_ids]
-
-        if not formatted_job_ids:
-            return statuses
-
-        try:
-            # Get all job statuses and reasons in one call
-            job_list = ",".join(formatted_job_ids)
-            out = os.popen(
-                f"squeue -j {job_list} --format='%i %T %r' --noheader"
-            ).read()
-
-            # Parse squeue output
-            for line in out.strip().split("\n"):
-                if line.strip():
-                    parts = line.strip().split()
-                    if len(parts) >= 2:
-                        job_id = parts[0]
-                        status = parts[1]
-                        reason = " ".join(parts[2:]) if len(parts) > 2 else ""
-
-                        # Convert PENDING with DependencyNeverSatisfied to BLOCKED
-                        if status == "PENDING" and "DependencyNeverSatisfied" in reason:
-                            status = "BLOCKED"
-
-                        statuses[job_id] = (
-                            on_add_status(status) if on_add_status else status
-                        )
-
-            # For jobs not found in squeue (completed, failed, etc), fall back to sacct
-            missing_jobs = set(formatted_job_ids) - set(statuses.keys())
-            for job_id in missing_jobs:
-                try:
-                    out = os.popen(
-                        f"sacct -j {job_id} --format state --noheader"
-                    ).read()
-                    status = out.strip().split("\n")[0].strip()
-                    statuses[job_id] = (
-                        on_add_status(status) if on_add_status else status
-                    )
-                except:
-                    statuses[job_id] = "UNKNOWN"
-
-        except:
-            # Fallback to individual sacct calls if squeue fails
-            for job_id in formatted_job_ids:
-                try:
-                    out = os.popen(
-                        f"sacct -j {job_id} --format state --noheader"
-                    ).read()
-                    status = out.strip().split("\n")[0].strip()
-                    statuses[job_id] = (
-                        on_add_status(status) if on_add_status else status
-                    )
-                except:
-                    statuses[job_id] = "UNKNOWN"
-
-        return statuses
 
     def _parse_group_dict(self, d: Dict[str, Any]) -> PGroup:
         """Convert the `group` sub-dict into a PGroup (recursive)."""
@@ -181,6 +191,21 @@ class JobDB:
             return f"{field} = ?", value
         else:
             raise ValueError(f"Invalid filter: {filter_str}")
+
+
+    def _parse_preamble(self, preamble: str, job_id:str) -> Tuple[str, str]:
+        """Parse the preamble to extract SLURM output and error paths."""
+        output_match = re.search(r'#SBATCH\s+--output[=\s]+(\S+)', preamble)
+        error_match = re.search(r'#SBATCH\s+--error[=\s]+(\S+)', preamble)
+        output_path = output_match.group(1) if output_match else ""
+        error_path = error_match.group(1) if error_match else ""
+        for spec in ["%j", "%J"]:
+            if spec in output_path:
+                output_path = output_path.replace(spec, job_id)
+            if spec in error_path:
+                error_path = error_path.replace(spec, job_id)
+        return output_path, error_path
+
 
 
     def _run_query(self, query: str, params: List[Any] = []) -> List[sqlite3.Row]:
@@ -267,10 +292,9 @@ class JobDB:
         job_ids = [job[0] for job in jobs]
 
         # Get job statuses from SLURM
+        job_states = {str(job['id']): {"status": "UNKNOWN", "start": None, "end": None} for job in jobs}
         if not ignore_status:
-            job_statuses = self._get_job_statuses(job_ids)
-        else:
-            job_statuses = {str(job['id']): "UNKNOWN" for job in jobs}
+            job_states = self._get_job_state(job_ids)
 
 
         # Filter out jobs based on status filter
@@ -279,7 +303,7 @@ class JobDB:
             jobs = [
                 job
                 for job in jobs
-                if job_statuses.get(str(job['id']), "UNKNOWN").lower() == value.lower()
+                if job_states.get(job['id'], {}).get('status', 'UNKNOWN').lower() == value.lower()
             ]
 
         # Convert to JobSpec objects
@@ -288,12 +312,14 @@ class JobDB:
             row_dict = dict(row)
             row_dict["parents"] = row_dict["parents"].split(',') if row_dict["parents"] else []
             row_dict["children"] = row_dict["children"].split(',') if row_dict["children"] else []
-            row_dict["status"] = job_statuses.get(
-                str(row_dict["id"]), "UNKNOWN"
-            )
-            # # parse #SBATCH --output= and #SBATCH --error= fields
-            # if row_dict.get("preamble"):
-            #     slurm_output =re
+            row_dict["status"] = job_states.get(row_dict["id"], {}).get("status", "UNKNOWN").lower()
+            row_dict["start_time"] = job_states.get(row_dict["id"], {}).get("start", None)
+            row_dict["end_time"] = job_states.get(row_dict["id"], {}).get("end", None)
+            out_path, err_path = self._parse_preamble(row_dict.get("preamble", ""), row_dict["id"])
+            row_dict["slurm_out"] = osp.join(job_states.get(row_dict["id"], {}).get("workdir", ""), out_path) if out_path else None
+            row_dict["slurm_err"] = osp.join(job_states.get(row_dict["id"], {}).get("workdir", ""), err_path) if err_path else None
+
+            print(f"Job {row_dict['id']} - Slurm Out: {row_dict['slurm_out']}, Slurm Err: {row_dict['slurm_err']}")
 
             result.append(Job(**row_dict))
 

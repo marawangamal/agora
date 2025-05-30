@@ -2134,6 +2134,11 @@
                         <div class="job-detail-label">End Time</div>
                         <div class="job-detail-value">${formatTime(job.end_time)}</div>
                     </div>
+
+                    <div class="job-detail-item">
+                        <div class="job-detail-label">Slurm</div>
+                        <div class="job-detail-value">${job.slurm_out}</div>
+                    </div>
                 </div>
                 
                 ${resourceInfo}
