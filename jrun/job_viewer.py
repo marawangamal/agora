@@ -229,9 +229,7 @@ class JobViewer(JobDB):
             id_map[job.id] = sid
             # NEW – no escape(), just swap double quotes for single quotes
             clean_cmd = short(job.command).replace('"', "'")
-            label = (
-                f"{icons.get(job.status,'?')} {job.id}<br/><code>{clean_cmd}</code>"
-            )
+            label = f"{icons.get(job.status,'?')} {job.id}<br/><code>{clean_cmd}</code>"
             print(f'    state "{label}" as {sid}')
 
         # Edges
@@ -270,7 +268,11 @@ class JobViewer(JobDB):
 
         print(json.dumps(output, indent=2))
 
-    def status(self, filters: Optional[List[str]] = None, cols: List[str] = ["id", "node_name", "node_id", "command", "status"]) -> None:
+    def status(
+        self,
+        filters: Optional[List[str]] = None,
+        cols: List[str] = ["id", "node_name", "node_id", "command", "status"],
+    ) -> None:
         """Display a simple job status table using tabulate."""
         jobs = self.get_jobs(filters=filters)
         if not jobs:
@@ -278,14 +280,9 @@ class JobViewer(JobDB):
             return
         table_data = []
         for job in jobs:
-            table_data.append(
-                [getattr(job, col) or 'n/a' for col in cols]
-            )
+            table_data.append([getattr(job, col) or "n/a" for col in cols])
         # Print table using tabulate
         print(
-            "\n"
-            + tabulate(
-                table_data, headers=cols, tablefmt="grid", maxcolwidths=100
-            )
+            "\n" + tabulate(table_data, headers=cols, tablefmt="grid", maxcolwidths=100)
         )
         print(self._get_footer(jobs))

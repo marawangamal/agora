@@ -24,27 +24,24 @@ def create_app(default_db: str, web_folder: Path) -> Flask:
 
         # Otherwise just return array
         return jsonify(jobs_data)
-        
+
     @app.route("/api/logs/<job_id>")
     def api_logs(job_id):
-        path = request.args.get('path')
-        start = request.args.get('start', type=int)
-        end = request.args.get('end', type=int)
-        
+        path = request.args.get("path")
+        start = request.args.get("start", type=int)
+        end = request.args.get("end", type=int)
+
         if not path or not os.path.exists(path):
             return jsonify({"error": "File not found"}), 404
-        
+
         try:
-            with open(path, 'r') as f:
+            with open(path, "r") as f:
                 lines = f.readlines()
-            
+
             if start is not None or end is not None:
                 lines = lines[start:end]
 
-            return jsonify({
-                "content": "".join(lines),
-                "total_lines": len(lines)
-            })
+            return jsonify({"content": "".join(lines), "total_lines": len(lines)})
         except:
             return jsonify({"error": "Read failed"}), 500
 

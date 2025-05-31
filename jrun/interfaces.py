@@ -3,7 +3,6 @@ import time
 from typing import Any, Dict, List, Literal, Optional, Union
 
 
-
 @dataclass
 class JobInsert:
     id: str
@@ -17,6 +16,7 @@ class JobInsert:
     def to_dict(self) -> Dict[str, Any]:
         return asdict(self)
 
+
 @dataclass
 class Job:
     """Specification for a SLURM job."""
@@ -29,15 +29,16 @@ class Job:
     parents: List[str] = field(default_factory=list)
     children: List[str] = field(default_factory=list)
     # Fields not in vw_jobs
-    status: str = "UNKNOWN"  
+    status: str = "UNKNOWN"
     slurm_out: Optional[str] = None
     slurm_err: Optional[str] = None
     created_at: str = time.strftime("%Y-%m-%d %H:%M:%S")
     updated_at: str = time.strftime("%Y-%m-%d %H:%M:%S")
     start_time: Optional[str] = None
     end_time: Optional[str] = None
-    inactive_parents: List[str] = field(default_factory=list)  # Parents that are completed
-
+    inactive_parents: List[str] = field(
+        default_factory=list
+    )  # Parents that are completed
 
     @property
     def preamble_sbatch(self) -> List[str]:

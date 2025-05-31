@@ -1,4 +1,3 @@
-
 import os
 import os.path as osp
 import re
@@ -35,7 +34,8 @@ class JobDB:
         conn.execute("PRAGMA foreign_keys = ON")
 
         # Create jobs table if it doesn't exist
-        cursor.execute("""
+        cursor.execute(
+            """
         CREATE TABLE IF NOT EXISTS jobs (
             id TEXT PRIMARY KEY,
             command TEXT NOT NULL,
@@ -45,9 +45,11 @@ class JobDB:
             node_id TEXT,
             node_name TEXT
         )
-        """)
+        """
+        )
 
-        cursor.execute("""
+        cursor.execute(
+            """
         CREATE TABLE IF NOT EXISTS deps (
             parent TEXT NOT NULL,
             child TEXT NOT NULL,
@@ -56,16 +58,19 @@ class JobDB:
             FOREIGN KEY (child) REFERENCES jobs(job_id) ON DELETE CASCADE ON UPDATE CASCADE, -- delete record if child is deleted
             UNIQUE (parent, child, dep_type)
         )
-        """)
+        """
+        )
 
-        cursor.execute("""
+        cursor.execute(
+            """
         CREATE VIEW IF NOT EXISTS vw_jobs AS
             SELECT
                 j.*,
                 (SELECT GROUP_CONCAT(d.child, ',') FROM deps d WHERE d.parent = j.id) AS children,
                 (SELECT GROUP_CONCAT(d2.parent, ',') FROM deps d2 WHERE d2.child = j.id) AS parents
             FROM jobs j;
-        """)
+        """
+        )
         conn.commit()
         conn.close()
 
@@ -146,10 +151,19 @@ class JobDB:
     @staticmethod
     def get_job_states(job_ids: list) -> Dict[str, Dict[str, str]]:
         job_list = ",".join(str(j) for j in job_ids)
-        output = os.popen(f"sacct -j {job_list} --format jobid,state,start,end,workdir --noheader --parsable2").read()
-        return {parts[0]: {"status": parts[1], "start": parts[2], "end": parts[3], "workdir": parts[4]}
-                for line in output.strip().split("\n") if (parts := line.split("|")) and len(parts) >= 4}
-
+        output = os.popen(
+            f"sacct -j {job_list} --format jobid,state,start,end,workdir --noheader --parsable2"
+        ).read()
+        return {
+            parts[0]: {
+                "status": parts[1],
+                "start": parts[2],
+                "end": parts[3],
+                "workdir": parts[4],
+            }
+            for line in output.strip().split("\n")
+            if (parts := line.split("|")) and len(parts) >= 4
+        }
 
     def _parse_group_dict(self, d: Dict[str, Any]) -> PGroup:
         """Convert the `group` sub-dict into a PGroup (recursive)."""
@@ -192,11 +206,10 @@ class JobDB:
         else:
             raise ValueError(f"Invalid filter: {filter_str}")
 
-
-    def _parse_preamble(self, preamble: str, job_id:str) -> Tuple[str, str]:
+    def _parse_preamble(self, preamble: str, job_id: str) -> Tuple[str, str]:
         """Parse the preamble to extract SLURM output and error paths."""
-        output_match = re.search(r'#SBATCH\s+--output[=\s]+(\S+)', preamble)
-        error_match = re.search(r'#SBATCH\s+--error[=\s]+(\S+)', preamble)
+        output_match = re.search(r"#SBATCH\s+--output[=\s]+(\S+)", preamble)
+        error_match = re.search(r"#SBATCH\s+--error[=\s]+(\S+)", preamble)
         output_path = output_match.group(1) if output_match else ""
         error_path = error_match.group(1) if error_match else ""
         for spec in ["%j", "%J"]:
@@ -206,7 +219,6 @@ class JobDB:
                 error_path = error_path.replace(spec, job_id)
         return output_path, error_path
 
-
     def _run_query(self, query: str, params: List[Any] = []) -> List[sqlite3.Row]:
         conn = sqlite3.connect(self.db_path)
         conn.row_factory = sqlite3.Row
@@ -215,7 +227,6 @@ class JobDB:
         rows = cursor.fetchall()
         conn.close()
         return rows
-
 
     ############################################################################
     #                                CRUD operations (jobs)                    #
@@ -232,14 +243,19 @@ class JobDB:
             cur.execute(f"INSERT INTO jobs ({columns}) VALUES ({placeholders})", values)
             conn.commit()
 
-    def delete_job(self, job_id: str, cascade: bool = True, on_delete: Optional[Callable[[str], None]] = None) -> None:
+    def delete_job(
+        self,
+        job_id: str,
+        cascade: bool = True,
+        on_delete: Optional[Callable[[str], None]] = None,
+    ) -> None:
 
         jobs = self.get_jobs([f"id={job_id}"], ignore_status=True)
         job = jobs[0] if jobs else None
         if not job:
             print(f"Job {job_id} not found, nothing to delete.")
             return
-        
+
         with sqlite3.connect(self.db_path) as conn:
             cur = conn.cursor()
             cur.execute(
@@ -258,7 +274,9 @@ class JobDB:
         set_clause = ", ".join(f"{k} = ?" for k in job.to_dict().keys())
         params = list(job.to_dict().values()) + [job_id]
 
-        query = f"UPDATE jobs SET {set_clause}, updated_at = datetime('now') WHERE id = ?"
+        query = (
+            f"UPDATE jobs SET {set_clause}, updated_at = datetime('now') WHERE id = ?"
+        )
 
         with sqlite3.connect(self.db_path) as conn:
             cur = conn.cursor()
@@ -292,10 +310,12 @@ class JobDB:
         job_ids = [job[0] for job in jobs]
 
         # Get job statuses from SLURM
-        job_states = {str(job['id']): {"status": "UNKNOWN", "start": None, "end": None} for job in jobs}
+        job_states = {
+            str(job["id"]): {"status": "UNKNOWN", "start": None, "end": None}
+            for job in jobs
+        }
         if not ignore_status:
             job_states = self.get_job_states(job_ids)
-
 
         # Filter out jobs based on status filter
         if status_filter:
@@ -303,32 +323,58 @@ class JobDB:
             jobs = [
                 job
                 for job in jobs
-                if job_states.get(job['id'], {}).get('status', 'UNKNOWN').lower() == value.lower()
+                if job_states.get(job["id"], {}).get("status", "UNKNOWN").lower()
+                == value.lower()
             ]
 
         # Convert to JobSpec objects
         result = []
         for row in jobs:
             row_dict = dict(row)
-            row_dict["parents"] = row_dict["parents"].split(',') if row_dict["parents"] else []
-            row_dict["children"] = row_dict["children"].split(',') if row_dict["children"] else []
-            row_dict["status"] = job_states.get(row_dict["id"], {}).get("status", "UNKNOWN")
-            row_dict["start_time"] = job_states.get(row_dict["id"], {}).get("start", None)
+            row_dict["parents"] = (
+                row_dict["parents"].split(",") if row_dict["parents"] else []
+            )
+            row_dict["children"] = (
+                row_dict["children"].split(",") if row_dict["children"] else []
+            )
+            row_dict["status"] = job_states.get(row_dict["id"], {}).get(
+                "status", "UNKNOWN"
+            )
+            row_dict["start_time"] = job_states.get(row_dict["id"], {}).get(
+                "start", None
+            )
             row_dict["end_time"] = job_states.get(row_dict["id"], {}).get("end", None)
-            out_path, err_path = self._parse_preamble(row_dict.get("preamble", ""), row_dict["id"])
-            row_dict["slurm_out"] = osp.join(job_states.get(row_dict["id"], {}).get("workdir", ""), out_path) if out_path else None
-            row_dict["slurm_err"] = osp.join(job_states.get(row_dict["id"], {}).get("workdir", ""), err_path) if err_path else None
+            out_path, err_path = self._parse_preamble(
+                row_dict.get("preamble", ""), row_dict["id"]
+            )
+            row_dict["slurm_out"] = (
+                osp.join(
+                    job_states.get(row_dict["id"], {}).get("workdir", ""), out_path
+                )
+                if out_path
+                else None
+            )
+            row_dict["slurm_err"] = (
+                osp.join(
+                    job_states.get(row_dict["id"], {}).get("workdir", ""), err_path
+                )
+                if err_path
+                else None
+            )
             result.append(Job(**row_dict))
 
         return result
-
 
     ############################################################################
     #                                CRUD operations (deps)                    #
     ############################################################################
 
-
-    def upsert_deps(self, child_id: str, parent_ids: List[str], dep_type: Literal["afterok", "afterany"] = "afterok") -> None:
+    def upsert_deps(
+        self,
+        child_id: str,
+        parent_ids: List[str],
+        dep_type: Literal["afterok", "afterany"] = "afterok",
+    ) -> None:
         """Update dependencies for a job."""
         with sqlite3.connect(self.db_path) as conn:
             cur = conn.cursor()
@@ -346,7 +392,6 @@ class JobDB:
                     (parent_id, child_id, dep_type),
                 )
             conn.commit()
-
 
     # def update_depends_on(self, new_job_id: int, old_job_id: int) -> None:
     #     """Update all jobs that depend on old_job_id to depend on new_job_id instead."""
@@ -386,4 +431,3 @@ class JobDB:
     #     conn.close()
 
     #     print(f"Updated dependencies for {updated_count} jobs")
-

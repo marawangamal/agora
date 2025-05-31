@@ -18,6 +18,7 @@ INACTIVE_PARENT_RULES = [
     lambda id, status, force: status in ["FAILED", "CANCELLED"] and force,
 ]
 
+
 class JobSubmitter(JobDB):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -63,7 +64,9 @@ class JobSubmitter(JobDB):
                 prev_jobs = self.get_jobs([f"command='{job.command}'"])
                 prev_job = prev_jobs[0] if prev_jobs else None
                 if prev_job and prev_job.status in ignore_statuses:
-                    print(f"Job {prev_job.id} already submitted with status {prev_job.status}.")
+                    print(
+                        f"Job {prev_job.id} already submitted with status {prev_job.status}."
+                    )
                     return prev_job.id
 
             # 3. Submit job (sbatch)
@@ -71,11 +74,14 @@ class JobSubmitter(JobDB):
             job.id = self._parse_job_id(result)
             print(f"Submitted job with ID {job.id}")
 
-
             # 4. Upsert job in the database
-            upsert_job = JobInsert(**{
-                k: v for k, v in job.to_dict().items() if k in JobInsert.__dataclass_fields__
-            })
+            upsert_job = JobInsert(
+                **{
+                    k: v
+                    for k, v in job.to_dict().items()
+                    if k in JobInsert.__dataclass_fields__
+                }
+            )
 
             # clean up
             if prev_job:
@@ -130,7 +136,7 @@ class JobSubmitter(JobDB):
                     parent_state = parent_states.get(parent_id, {})
                     if rule(parent_id, parent_state.get("status", ""), force):
                         job.inactive_parents.append(parent_id)
-            
+
             self._submit_job(
                 job, dry=False, ignore_statuses=ignore_statuses, prev_job_id=job_id
             )
@@ -171,11 +177,11 @@ class JobSubmitter(JobDB):
         preamble_map: Dict[str, str],
         debug: bool = False,
         depends_on: List[str] = [],
-        group_name: str = "",
         submitted_jobs: List[str] = [],
         submit_fn: Optional[Callable[[Job], str]] = None,
         group_id: Optional[str] = None,
-        loop_id: Optional[str] = None,
+        node_id: Optional[str] = None,
+        node_name: str = "",
     ):
         """Recursively walk the job tree and submit jobs."""
         submit_fn = submit_fn if submit_fn is not None else self._submit_job
@@ -191,10 +197,9 @@ class JobSubmitter(JobDB):
                 id=job_id,
                 command=node.command,
                 preamble=preamble_map.get(node.preamble, ""),
-                node_id=loop_id,
-                node_name=group_name,
+                node_id=node_id,
+                node_name=node_name,
                 parents=[str(_id) for _id in depends_on],
-
             )
             job.command = job.command.format(group_id=group_id)
             if debug:
@@ -211,9 +216,13 @@ class JobSubmitter(JobDB):
             sweep = node.sweep
             # Generate all combinations of the sweep parameters
             keys = list(sweep.keys())
+
             values = list(sweep.values())
             # Generate all combinations of the sweep parameters
             combinations = [dict(zip(keys, v)) for v in itertools.product(*values)]
+            node_id = (
+                f"{random.randint(100000, 999999)}" if node_id is None else node_id
+            )
             # Iterate over the combinations
             for i, params in enumerate(combinations):
                 job_id = f"{random.randint(100000, 999999)}"
@@ -223,9 +232,8 @@ class JobSubmitter(JobDB):
                     command=cmd,
                     preamble=preamble_map.get(node.preamble, ""),
                     parents=[str(_id) for _id in depends_on],
-                    node_id=loop_id,
-                    node_name=group_name,
-
+                    node_id=node_id,
+                    node_name=node_name,
                 )
                 if debug:
                     print(f"\nDEBUG:\n{job.to_script(self.deptype)}\n")
@@ -240,7 +248,7 @@ class JobSubmitter(JobDB):
             # Sequential group
             for i, entry in enumerate(node.jobs):
                 group_name_i = ":".join(
-                    [p for p in [copy.deepcopy(group_name), entry.name] if p]
+                    [p for p in [copy.deepcopy(node_name), entry.name] if p]
                 )
                 job_ids = self.walk(
                     entry,
@@ -252,7 +260,7 @@ class JobSubmitter(JobDB):
                     submitted_jobs=submitted_jobs,
                     submit_fn=submit_fn,
                     group_id=copy.deepcopy(group_id),
-                    group_name=group_name_i,
+                    node_name=group_name_i,
                 )
                 if job_ids:
                     depends_on = copy.deepcopy(job_ids)
@@ -261,9 +269,12 @@ class JobSubmitter(JobDB):
         elif node.type == "parallel":
             # Parallel group
             parallel_job_ids = []
+            node_id = (
+                f"{random.randint(100000, 999999)}" if node_id is None else node_id
+            )
             for entry in node.jobs:
                 group_name_i = ":".join(
-                    [p for p in [copy.deepcopy(group_name), entry.name] if p]
+                    [p for p in [copy.deepcopy(node_name), entry.name] if p]
                 )
                 job_ids = self.walk(
                     entry,
@@ -273,7 +284,8 @@ class JobSubmitter(JobDB):
                     submitted_jobs=submitted_jobs,
                     submit_fn=submit_fn,
                     group_id=copy.deepcopy(group_id),
-                    group_name=group_name_i,
+                    node_name=group_name_i,
+                    node_id=node_id,
                 )
                 if job_ids:
                     parallel_job_ids.extend(job_ids)
@@ -282,13 +294,13 @@ class JobSubmitter(JobDB):
         elif node.type == "loop":
             # Sequential group
             sequential_job_ids = []
-            loop_id = (
-                f"{random.randint(100000, 999999)}" if loop_id is None else loop_id
+            node_id = (
+                f"{random.randint(100000, 999999)}" if node_id is None else node_id
             )
             for t in range(node.loop_count):
                 for i, entry in enumerate(node.jobs):
                     group_name_i = ":".join(
-                        [p for p in [copy.deepcopy(group_name), entry.name] if p]
+                        [p for p in [copy.deepcopy(node_name), entry.name] if p]
                     )
                     job_ids = self.walk(
                         entry,
@@ -300,14 +312,14 @@ class JobSubmitter(JobDB):
                         submitted_jobs=submitted_jobs,
                         submit_fn=submit_fn,
                         group_id=copy.deepcopy(group_id),
-                        group_name=group_name_i,
-                        loop_id=loop_id,
+                        node_name=group_name_i,
+                        node_id=node_id,
                     )
                     if job_ids:
                         # depends_on.extend(job_ids)
                         sequential_job_ids.extend(job_ids)
                         depends_on = copy.deepcopy(job_ids)
-            return sequential_job_ids[-1:] or sequential_job_ids 
+            return sequential_job_ids[-1:] or sequential_job_ids
 
         return submitted_jobs
 
