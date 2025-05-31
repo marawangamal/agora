@@ -2812,9 +2812,9 @@
                         <div class="job-detail-label">Dependencies</div>
                         <div class="job-detail-value">
                             ${
-                              job.depends_on && job.depends_on.length > 0
+                              job.parents && job.parents.length > 0
                                 ? `<div class="dependency-list">
-                                    ${job.depends_on
+                                    ${job.parents
                                       .map(
                                         (dep) =>
                                           `<span class="dependency-tag">#${dep}</span>`

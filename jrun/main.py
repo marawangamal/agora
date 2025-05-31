@@ -101,9 +101,16 @@ def parse_args():
     p_clean = sub.add_parser("delete", help="Clear up the database")
     p_clean.add_argument("--db", default=default_db, help="SQLite DB path")
     p_clean.add_argument(
-        "job_ids",
+        "-j",
+        "--job_ids",
         nargs="*",  # Zero or more (optional)
         help="Job IDs to delete (space-separated)",
+    )
+    p_clean.add_argument(
+        "-n",
+        "--node_ids",
+        nargs="*",
+        help="Node IDs to delete (space-separated). If provided, deletes jobs for these nodes only.",
     )
 
     ###### jrun retry (resubmit jobs)
@@ -222,14 +229,19 @@ def main():
     # Delete the database
     elif args.cmd == "delete":
         jr = JobSubmitter(args.db)
-        if not args.job_ids:
-            # If no job IDs are provided, ask for confirmation to delete the database
+        if args.node_ids:
+            # If node_ids are provided, delete jobs for those nodes
+            jr.delete_by_node(args.node_ids)
+            return
+        elif args.job_ids:
+            jr.delete(args.job_ids, cascade=True)
+        else:
+            # If no IDs are provided, ask for confirmation to delete the database
             ask_user_yes_no_question(
                 question="Are you sure you want to delete the database? (y/n): ",
                 on_yes=lambda: jr.delete(),
                 on_no=lambda: print("Database deletion cancelled."),
             )
-        jr.delete(args.job_ids, cascade=True)
 
     # Cancel jobs
     elif args.cmd == "cancel":

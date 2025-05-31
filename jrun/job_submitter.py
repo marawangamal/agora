@@ -121,6 +121,23 @@ class JobSubmitter(JobDB):
             print(f"Deleting job {id}")
             self.delete_job(id, on_delete=lambda id: self.cancel(id), cascade=cascade)
 
+    def delete_by_node(self, node_ids: List[str]):
+        """Delete all jobs associated with specific node IDs."""
+        if not node_ids:
+            print("No node IDs provided, deleting all jobs in the database.")
+            return
+        for node_id in node_ids:
+            jobs = self.get_jobs([f"node_id={node_id}"])
+            if not jobs:
+                print(f"No jobs found for node ID {node_id}.")
+                continue
+
+            for job in jobs:
+                print(f"Deleting job {job.id} associated with node {node_id}")
+                self.delete_job(
+                    job.id, on_delete=lambda id: self.cancel(id), cascade=True
+                )
+
     def retry(self, job_id: str, force: bool = False):
         """Retry a job with the given job ID."""
         job = self.get_jobs([f"id={job_id}"])[0]

@@ -82,7 +82,7 @@ class Job:
             if len(active_parents) != 0:
                 dependencies = ":".join(active_parents)
                 script_lines.append(f"#SBATCH --dependency={deptype}:{dependencies}")
-                print(f"Adding dependencies: {dependencies} for job {self.id}")
+                # print(f"Adding dependencies: {dependencies} for job {self.id}")
 
         # Add setup commands
         if setup_lines:
