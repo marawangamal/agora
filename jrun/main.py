@@ -229,7 +229,7 @@ def main():
                 on_yes=lambda: jr.delete(),
                 on_no=lambda: print("Database deletion cancelled."),
             )
-        jr.delete_job(args.job_ids, cascade=True)
+        jr.delete(args.job_ids, cascade=True)
 
     # Cancel jobs
     elif args.cmd == "cancel":
