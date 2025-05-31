@@ -184,9 +184,10 @@ group:
 - [x] Improve visual for loop group
 - [x] Improve dependency (make markovian)
 - [x] View job logs in browser
+- [x] Delete by node
 
 ## Planned Features
-- [ ] Delete and retry entire node/group -- parallel group to also use `node_id` and remove frontend signature logic
+- [ ] Add loop_idx and sweep_idx
 - [ ] Update afterany (allow some parent group failures)
 - [ ] Update node color code (mixed with pending should be blue/active)
 

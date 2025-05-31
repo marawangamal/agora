@@ -243,7 +243,7 @@ class JobSubmitter(JobDB):
             # Iterate over the combinations
             for i, params in enumerate(combinations):
                 job_id = f"{random.randint(100000, 999999)}"
-                cmd = cmd_template.format(**params, group_id=group_id)
+                cmd = cmd_template.format(**params, group_id=group_id, sidx=i)
                 job = Job(
                     id=job_id,
                     command=cmd,
@@ -252,6 +252,7 @@ class JobSubmitter(JobDB):
                     node_id=node_id,
                     node_name=node_name,
                 )
+
                 if debug:
                     print(f"\nDEBUG:\n{job.to_script(self.deptype)}\n")
                 else:
