@@ -144,7 +144,7 @@ class JobDB:
     #     return statuses
 
     @staticmethod
-    def _get_job_state(job_ids: list) -> Dict[str, Dict[str, str]]:
+    def get_job_states(job_ids: list) -> Dict[str, Dict[str, str]]:
         job_list = ",".join(str(j) for j in job_ids)
         output = os.popen(f"sacct -j {job_list} --format jobid,state,start,end,workdir --noheader --parsable2").read()
         return {parts[0]: {"status": parts[1], "start": parts[2], "end": parts[3], "workdir": parts[4]}
@@ -294,7 +294,7 @@ class JobDB:
         # Get job statuses from SLURM
         job_states = {str(job['id']): {"status": "UNKNOWN", "start": None, "end": None} for job in jobs}
         if not ignore_status:
-            job_states = self._get_job_state(job_ids)
+            job_states = self.get_job_states(job_ids)
 
 
         # Filter out jobs based on status filter

@@ -13,6 +13,10 @@ from jrun._base import JobDB
 from jrun.interfaces import Job, JobInsert, Job, PGroup, PJob
 
 JOB_RE = re.compile(r"Submitted batch job (\d+)")
+INACTIVE_PARENT_RULES = [
+    lambda id, status, force: status in ["COMPLETED"],
+    lambda id, status, force: status in ["FAILED", "CANCELLED"] and force,
+]
 
 class JobSubmitter(JobDB):
     def __init__(self, *args, **kwargs):
@@ -111,12 +115,21 @@ class JobSubmitter(JobDB):
             print(f"Deleting job {id}")
             self.delete_job(id, on_delete=lambda id: self.cancel(id), cascade=cascade)
 
-    def retry(self, job_id: str, job: Optional[Job] = None, force: bool = False):
+    def retry(self, job_id: str, force: bool = False):
         """Retry a job with the given job ID."""
-        job = self.get_jobs([f"id={job_id}"])[0] if job is None else job
+        job = self.get_jobs([f"id={job_id}"])[0]
+        parent_states = self.get_job_states(job.parents)
+
         if job:
             print(f"Retrying job {job_id}")
             ignore_statuses = ["COMPLETED"] if not force else []
+
+            # Add inactive parents to the job
+            for parent_id in job.parents:
+                for rule in INACTIVE_PARENT_RULES:
+                    parent_state = parent_states.get(parent_id, {})
+                    if rule(parent_id, parent_state.get("status", ""), force):
+                        job.inactive_parents.append(parent_id)
             
             self._submit_job(
                 job, dry=False, ignore_statuses=ignore_statuses, prev_job_id=job_id

@@ -36,6 +36,7 @@ class Job:
     updated_at: str = time.strftime("%Y-%m-%d %H:%M:%S")
     start_time: Optional[str] = None
     end_time: Optional[str] = None
+    inactive_parents: List[str] = field(default_factory=list)  # Parents that are completed
 
 
     @property
@@ -76,9 +77,11 @@ class Job:
             # Convert job IDs to a colon-separated string
             # (e.g., "123:456:789")
             # Filter out inactive dependencies
-            if len(self.parents) != 0:
-                dependencies = ":".join(self.parents)
+            active_parents = [p for p in self.parents if p not in self.inactive_parents]
+            if len(active_parents) != 0:
+                dependencies = ":".join(active_parents)
                 script_lines.append(f"#SBATCH --dependency={deptype}:{dependencies}")
+                print(f"Adding dependencies: {dependencies} for job {self.id}")
 
         # Add setup commands
         if setup_lines:

@@ -183,11 +183,13 @@ group:
 - [x] Web app
 - [x] Improve visual for loop group
 - [x] Improve dependency (make markovian)
+- [x] View job logs in browser
 
 ## Planned Features
+- [ ] Delete and retry entire node/group -- parallel group to also use `node_id` and remove frontend signature logic
 - [ ] Update afterany (allow some parent group failures)
 - [ ] Update node color code (mixed with pending should be blue/active)
-- [ ] View job logs in the web
+
 
 
 <!-- sacct -j 6894879 --format=JobID,WorkDir -X --parsable2 -->

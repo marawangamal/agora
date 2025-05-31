@@ -2064,12 +2064,49 @@
         return new Date(timeString).toLocaleTimeString();
     }
 
+    // Add this function after the formatTime function
+    function calculateTotalDuration(jobs) {
+        let totalMs = 0;
+        let validJobs = 0;
+        
+        jobs.forEach(job => {
+            if (job.start_time && job.end_time) {
+                const start = new Date(job.start_time);
+                const end = new Date(job.end_time);
+                const duration = end - start;
+                
+                // Check if duration is valid (not NaN and positive)
+                if (!isNaN(duration) && duration > 0) {
+                    totalMs += duration;
+                    validJobs++;
+                }
+            }
+        });
+        
+        if (validJobs === 0) {
+            return "N/A";
+        }
+        
+        // Convert to human readable format
+        const totalMins = Math.floor(totalMs / 60000);
+        const totalHours = Math.floor(totalMins / 60);
+        const remainingMins = totalMins % 60;
+        
+        if (totalHours > 0) {
+            return `${totalHours}h ${remainingMins}m`;
+        } else if (totalMins > 0) {
+            return `${totalMins}m`;
+        } else {
+            return "< 1m";
+        }
+    }
+
     // Updated color logic based on new rules
     function getNodeColor(jobs) {
         const statuses = jobs.map(job => job.status);
         
         // Rule 3: Use active color (blue) if at least one job is running
-        if (statuses.includes("RUNNING")) {
+        if (statuses.includes("RUNNING") || (statuses.includes("PENDING") && statuses.includes("COMPLETED"))) {
             return "RUNNING";
         }
         
@@ -2139,13 +2176,16 @@
             const progress = calculateProgress(groupJobs);
             const nodeColor = getNodeColor(groupJobs);
             
+            const totalDuration = calculateTotalDuration(groupJobs);
+
             groups.push({
                 id: `group_${groupIndex++}`,
                 jobs: groupJobs,
                 parents: new Set(groupJobs[0].parents),
                 children: parentToChildMap.get(groupJobs[0].id.toString()) || new Set(),
                 progress: progress,
-                nodeColor: nodeColor
+                nodeColor: nodeColor,
+                totalDuration: totalDuration
             });
         });
 
@@ -2212,6 +2252,7 @@
         tooltip.innerHTML = `
             <div class="tooltip-header">Group #${displayText}</div>
             <div class="tooltip-breakdown">${breakdown}</div>
+            <div class="tooltip-breakdown">Total Duration: ${group.totalDuration}</div>
         `;
         
         // Position tooltip
@@ -2270,7 +2311,7 @@
             const borderColor = getStatusColor(nodeColor);
             
             // Simple label like the original
-            const label = `#${displayText}\n${groupName}\n${progress}% done`;
+            const label = `#${displayText}\n${groupName}\n${progress}% done\n⏱️ ${group.totalDuration}`;
             
             elements.push({
                 data: {
@@ -2455,7 +2496,7 @@
                         return `
                             <div style="border: 1px solid var(--border-primary); border-radius: 8px; padding: 12px; background: var(--bg-secondary); cursor: pointer;" onclick="showGroupDetails({jobs: ${JSON.stringify(group.jobs).replace(/"/g, '&quot;')}, displayText: '${displayText}', groupName: '${groupName}'})">
                                 <div style="font-weight: bold; margin-bottom: 4px; color: var(--text-primary);">#${displayText} - ${groupName}</div>
-                                <div style="font-size: 12px; color: var(--text-secondary);">${progress}% complete • ${group.jobs.length} jobs</div>
+                                <div style="font-size: 12px; color: var(--text-secondary);">${progress}% complete • ${group.jobs.length} jobs • ${group.totalDuration}</div>
                                 <div style="font-size: 11px; color: var(--text-tertiary); margin-top: 4px;">${getStatusBreakdown(group.jobs)}</div>
                             </div>
                         `;
@@ -2528,6 +2569,10 @@
                 <span class="stat-value">${pendingJobs}</span>
                 <span>pending</span>
             </div>
+            <div class="stat-item">
+                <span class="stat-value">${group.totalDuration || calculateTotalDuration(group.jobs)}</span>
+                <span>total duration</span>
+            </div>
         `;
         
         // Update modal body
@@ -2568,6 +2613,8 @@
                     <div class="resource-info error-info">
                         <div class="resource-item">
                             <span class="resource-label">Error</span>
+                            
+</cut_off_point>
                             <span class="resource-value">${job.error_message}</span>
                         </div>
                     </div>
