@@ -207,7 +207,6 @@ class JobDB:
         return output_path, error_path
 
 
-
     def _run_query(self, query: str, params: List[Any] = []) -> List[sqlite3.Row]:
         conn = sqlite3.connect(self.db_path)
         conn.row_factory = sqlite3.Row
@@ -216,6 +215,7 @@ class JobDB:
         rows = cursor.fetchall()
         conn.close()
         return rows
+
 
     ############################################################################
     #                                CRUD operations (jobs)                    #
@@ -312,7 +312,7 @@ class JobDB:
             row_dict = dict(row)
             row_dict["parents"] = row_dict["parents"].split(',') if row_dict["parents"] else []
             row_dict["children"] = row_dict["children"].split(',') if row_dict["children"] else []
-            row_dict["status"] = job_states.get(row_dict["id"], {}).get("status", "UNKNOWN").lower()
+            row_dict["status"] = job_states.get(row_dict["id"], {}).get("status", "UNKNOWN")
             row_dict["start_time"] = job_states.get(row_dict["id"], {}).get("start", None)
             row_dict["end_time"] = job_states.get(row_dict["id"], {}).get("end", None)
             out_path, err_path = self._parse_preamble(row_dict.get("preamble", ""), row_dict["id"])
