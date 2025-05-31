@@ -55,6 +55,13 @@
         --filter-border: #e2e8f0;
         --filter-active: #3b82f6;
         --filter-active-bg: #eff6ff;
+
+        /* Log viewer colors */
+        --log-bg: #1a1a1a;
+        --log-text: #e5e5e5;
+        --log-border: #333333;
+        --log-scrollbar: #555555;
+        --log-scrollbar-thumb: #777777;
     }
 
     [data-theme="dark"] {
@@ -100,6 +107,13 @@
         --filter-border: #374151;
         --filter-active: #60a5fa;
         --filter-active-bg: #1e3a8a;
+
+        /* Log viewer colors (darker) */
+        --log-bg: #0f0f0f;
+        --log-text: #e5e5e5;
+        --log-border: #2a2a2a;
+        --log-scrollbar: #444444;
+        --log-scrollbar-thumb: #666666;
     }
 
     * {
@@ -776,6 +790,174 @@
         color: var(--error-text) !important;
     }
 
+    /* Log Viewer Styles */
+    .log-viewer-btn {
+        background: var(--status-pending) !important;
+        color: white !important;
+        font-size: 11px !important;
+        padding: 4px 8px !important;
+        margin-top: 8px;
+        border-radius: 4px;
+        border: none;
+        cursor: pointer;
+        transition: all 0.2s ease;
+    }
+
+    .log-viewer-btn:hover {
+        background: #d97706 !important;
+    }
+
+    .log-modal {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: var(--overlay);
+        display: none;
+        align-items: center;
+        justify-content: center;
+        z-index: 1001;
+        transition: background-color 0.3s ease;
+    }
+
+    .log-modal.show {
+        display: flex;
+    }
+
+    .log-modal-content {
+        background: var(--bg-secondary);
+        border-radius: 12px;
+        box-shadow: 0 20px 25px var(--shadow-primary);
+        max-width: 90vw;
+        max-height: 90vh;
+        width: 1000px;
+        height: 700px;
+        overflow: hidden;
+        animation: modalSlideIn 0.2s ease-out;
+        transition: background-color 0.3s ease;
+        display: flex;
+        flex-direction: column;
+    }
+
+    .log-modal-header {
+        padding: 20px 24px 16px 24px;
+        border-bottom: 1px solid var(--border-primary);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        transition: border-color 0.3s ease;
+        flex-shrink: 0;
+    }
+
+    .log-modal-title {
+        font-size: 18px;
+        font-weight: 600;
+        color: var(--text-primary);
+        font-family: monospace;
+    }
+
+    .log-controls {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+    }
+
+    .log-control-btn {
+        padding: 6px 12px;
+        border: 1px solid var(--border-primary);
+        border-radius: 6px;
+        background: var(--bg-quaternary);
+        color: var(--text-primary);
+        font-size: 12px;
+        cursor: pointer;
+        transition: all 0.2s ease;
+    }
+
+    .log-control-btn:hover {
+        background: var(--border-primary);
+    }
+
+    .log-control-btn.active {
+        background: var(--status-running);
+        color: white;
+        border-color: var(--status-running);
+    }
+
+    .log-viewer {
+        flex: 1;
+        background: var(--log-bg);
+        color: var(--log-text);
+        font-family: 'Courier New', monospace;
+        font-size: 13px;
+        line-height: 1.4;
+        padding: 16px;
+        overflow-y: auto;
+        white-space: pre-wrap;
+        word-wrap: break-word;
+        border: none;
+        outline: none;
+        resize: none;
+        transition: all 0.3s ease;
+    }
+
+    .log-viewer::-webkit-scrollbar {
+        width: 12px;
+    }
+
+    .log-viewer::-webkit-scrollbar-track {
+        background: var(--log-bg);
+    }
+
+    .log-viewer::-webkit-scrollbar-thumb {
+        background: var(--log-scrollbar-thumb);
+        border-radius: 6px;
+    }
+
+    .log-viewer::-webkit-scrollbar-thumb:hover {
+        background: #888888;
+    }
+
+    .log-status {
+        padding: 8px 16px;
+        background: var(--bg-tertiary);
+        border-top: 1px solid var(--border-primary);
+        font-size: 12px;
+        color: var(--text-secondary);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        flex-shrink: 0;
+    }
+
+    .log-status-indicator {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .log-status-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: var(--status-pending);
+    }
+
+    .log-status-dot.connected {
+        background: var(--status-completed);
+        animation: pulse 2s infinite;
+    }
+
+    .log-status-dot.error {
+        background: var(--status-failed);
+    }
+
+    @keyframes pulse {
+        0% { opacity: 1; }
+        50% { opacity: 0.5; }
+        100% { opacity: 1; }
+    }
+
     /* Responsive design */
     @media (max-width: 1200px) {
         .main-content {
@@ -808,7 +990,85 @@
         .header-controls {
             align-self: flex-end;
         }
+
+        .log-modal-content {
+            width: 95vw;
+            height: 85vh;
+        }
     }
+
+.log-buttons {
+    display: flex;
+    gap: 8px;
+    margin-top: 8px;
+    flex-wrap: wrap;
+}
+
+.log-viewer-btn.output-log {
+    background: var(--status-running) !important;
+    color: white !important;
+}
+
+.log-viewer-btn.error-log {
+    background: var(--status-failed) !important;
+    color: white !important;
+}
+
+.log-viewer-btn.output-log:hover {
+    background: #2563eb !important;
+}
+
+.log-viewer-btn.error-log:hover {
+    background: #dc2626 !important;
+}
+
+.tail-toggle-btn {
+    padding: 8px 16px !important;
+    border: 2px solid var(--border-primary) !important;
+    border-radius: 8px !important;
+    background: var(--bg-quaternary) !important;
+    color: var(--text-primary) !important;
+    font-size: 13px !important;
+    font-weight: 600 !important;
+    cursor: pointer;
+    transition: all 0.3s ease !important;
+    display: flex !important;
+    align-items: center !important;
+    gap: 8px !important;
+    min-width: 120px !important;
+    justify-content: center !important;
+}
+
+.tail-toggle-btn:hover {
+    background: var(--border-primary) !important;
+    transform: translateY(-1px) !important;
+    box-shadow: 0 2px 4px var(--shadow-secondary) !important;
+}
+
+.tail-toggle-btn.active {
+    background: var(--status-completed) !important;
+    color: white !important;
+    border-color: var(--status-completed) !important;
+    box-shadow: 0 0 0 3px var(--status-completed-bg) !important;
+}
+
+.tail-toggle-btn.active:hover {
+    background: #059669 !important;
+    border-color: #059669 !important;
+}
+
+.tail-status-icon {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--status-pending);
+    transition: all 0.3s ease;
+}
+
+.tail-toggle-btn.active .tail-status-icon {
+    background: white;
+    animation: pulse 2s infinite;
+}
 </style>
 </head>
 <body>
@@ -818,7 +1078,7 @@
             <h1>
                 🔗 SLURM Dependency Graph
             </h1>
-            <p class="subtitle">Professional dependency visualization with advanced filtering and search capabilities</p>
+            <p class="subtitle">Professional dependency visualization with advanced filtering and live log viewing</p>
             <div class="copyright">
                 <span>© 2024</span>
                 <a href="https://github.com/marawangamal/jrun" target="_blank">SLURM Visualizer</a>
@@ -964,6 +1224,33 @@
     </div>
 </div>
 
+<!-- Log Viewer Modal -->
+<div id="log-modal" class="log-modal">
+    <div class="log-modal-content">
+        <div class="log-modal-header">
+            <div class="log-modal-title" id="log-modal-title">job.slurm_out</div>
+            <div class="log-controls">
+    <button class="tail-toggle-btn" id="tail-toggle-btn" onclick="toggleTailing()">
+    <span class="tail-status-icon"></span>
+    <span>Tail: OFF</span>
+</button>
+    <button class="close-btn" onclick="closeLogModal()">&times;</button>
+</div>
+        </div>
+        <textarea class="log-viewer" id="log-viewer" readonly placeholder="Loading log file..."></textarea>
+        <div class="log-status">
+            <div class="log-status-indicator">
+                <div class="log-status-dot" id="log-status-dot"></div>
+                <span id="log-status-text">Disconnected</span>
+            </div>
+            <div id="log-info">
+                <span id="log-lines">0 lines</span> • 
+                <span id="log-size">0 bytes</span>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script>
     // Show fallback message initially
     document.getElementById('fallback').classList.add('show');
@@ -1022,121 +1309,6 @@
     }
 
     // Dummy job data for development
-    // const DUMMY_JOBS = [
-    //     {
-    //         job_id: 789012,
-    //         command: "jrun analyze --input dataset.csv --output results/",
-    //         group_name: "data_prep",
-    //         depends_on: [],
-    //         status: "COMPLETED",
-    //         preamble: "#!/bin/bash\n#SBATCH --job-name=analyze\n#SBATCH --time=01:00:00\n#SBATCH --mem=4G",
-    //         start_time: "2024-01-15 09:00:00",
-    //         end_time: "2024-01-15 09:45:00"
-    //     },
-    //     {
-    //         job_id: 123456,
-    //         command: "jrun viz --type scatter --input results/analysis.json",
-    //         group_name: "visualization",
-    //         depends_on: ["789012"],
-    //         status: "RUNNING",
-    //         preamble: "#!/bin/bash\n#SBATCH --job-name=viz-scatter\n#SBATCH --gres=gpu:1\n#SBATCH --time=02:00:00",
-    //         start_time: "2024-01-15 10:00:00",
-    //         stats: {
-    //             gpu_memory_used_mb: 8192,
-    //             gpu_memory_total_mb: 12288,
-    //             gpu_count: 1,
-    //             cpu_usage: 85
-    //         }
-    //     },
-    //     {
-    //         job_id: 123457,
-    //         command: "jrun viz --type histogram --input results/analysis.json",
-    //         group_name: "visualization",
-    //         depends_on: ["789012"],
-    //         status: "COMPLETED",
-    //         preamble: "#!/bin/bash\n#SBATCH --job-name=viz-histogram\n#SBATCH --gres=gpu:1",
-    //         start_time: "2024-01-15 10:00:00",
-    //         end_time: "2024-01-15 10:30:00"
-    //     },
-    //     {
-    //         job_id: 123458,
-    //         command: "jrun viz --type boxplot --input results/analysis.json",
-    //         group_name: "visualization",
-    //         depends_on: ["789012"],
-    //         status: "PENDING",
-    //         preamble: "#!/bin/bash\n#SBATCH --job-name=viz-boxplot\n#SBATCH --gres=gpu:1"
-    //     },
-    //     {
-    //         job_id: 345678,
-    //         command: "jrun preprocess --input data.csv --normalize --scale",
-    //         group_name: "preprocessing",
-    //         depends_on: ["789012"],
-    //         status: "COMPLETED",
-    //         preamble: "#!/bin/bash\n#SBATCH --job-name=preprocess\n#SBATCH --time=02:00:00\n#SBATCH --mem=8G",
-    //         start_time: "2024-01-15 09:50:00",
-    //         end_time: "2024-01-15 11:20:00"
-    //     },
-    //     {
-    //         job_id: 901234,
-    //         command: "jrun model_training --model linear --epochs 100",
-    //         group_name: "ml_pipeline",
-    //         depends_on: ["345678"],
-    //         status: "RUNNING",
-    //         preamble: "#!/bin/bash\n#SBATCH --job-name=train-linear\n#SBATCH --gres=gpu:2\n#SBATCH --time=04:00:00",
-    //         start_time: "2024-01-15 11:30:00",
-    //         stats: {
-    //             gpu_memory_used_mb: 20480,
-    //             gpu_memory_total_mb: 24576,
-    //             gpu_count: 2,
-    //             cpu_usage: 92
-    //         }
-    //     },
-    //     {
-    //         job_id: 901235,
-    //         command: "jrun model_training --model random_forest --trees 500",
-    //         group_name: "ml_pipeline",
-    //         depends_on: ["345678"],
-    //         status: "PENDING",
-    //         preamble: "#!/bin/bash\n#SBATCH --job-name=train-rf\n#SBATCH --time=04:00:00\n#SBATCH --mem=16G"
-    //     },
-    //     {
-    //         job_id: 901236,
-    //         command: "jrun model_training --model neural_net --layers 5",
-    //         group_name: "ml_pipeline",
-    //         depends_on: ["345678"],
-    //         status: "FAILED",
-    //         preamble: "#!/bin/bash\n#SBATCH --job-name=train-nn\n#SBATCH --gres=gpu:4",
-    //         start_time: "2024-01-15 11:30:00",
-    //         end_time: "2024-01-15 11:45:00",
-    //         error_message: "CUDA out of memory error"
-    //     },
-    //     {
-    //         job_id: 567890,
-    //         command: "jrun validation --cross-validate --folds 5",
-    //         group_name: "validation",
-    //         depends_on: ["123456", "123457", "345678"],
-    //         status: "PENDING",
-    //         preamble: "#!/bin/bash\n#SBATCH --job-name=validation-cv\n#SBATCH --time=01:30:00"
-    //     },
-    //     {
-    //         job_id: 567891,
-    //         command: "jrun validation --holdout --split 0.2",
-    //         group_name: "validation",
-    //         depends_on: ["123456", "123457", "345678"],
-    //         status: "PENDING",
-    //         preamble: "#!/bin/bash\n#SBATCH --job-name=validation-holdout\n#SBATCH --time=01:00:00"
-    //     },
-    //     {
-    //         job_id: 111222,
-    //         command: "jrun report --format pdf --template executive",
-    //         group_name: "reporting",
-    //         depends_on: ["567890", "567891"],
-    //         status: "PENDING",
-    //         preamble: "#!/bin/bash\n#SBATCH --job-name=report-pdf\n#SBATCH --time=00:30:00"
-    //     }
-    // ];
-
-    // Dummy job data for development
     const DUMMY_JOBS = [
         {
             job_id: 100001,
@@ -1146,7 +1318,9 @@
             status: "COMPLETED",
             preamble: "#!/bin/bash\n#SBATCH --job-name=model-sweep\n#SBATCH --time=00:30:00\n#SBATCH --mem=2G",
             start_time: "2024-01-15 08:00:00",
-            end_time: "2024-01-15 08:15:00"
+            end_time: "2024-01-15 08:15:00",
+            slurm_out: "/home/user/logs/job_100001.slurm_out",
+            slurm_err: "/home/user/logs/job_100001.slurm_err"
         },
         {
             job_id: 100002,
@@ -1156,7 +1330,9 @@
             status: "COMPLETED",
             preamble: "#!/bin/bash\n#SBATCH --job-name=model-sweep\n#SBATCH --time=00:30:00\n#SBATCH --mem=2G",
             start_time: "2024-01-15 08:00:00",
-            end_time: "2024-01-15 08:15:00"
+            end_time: "2024-01-15 08:15:00",
+            slurm_out: "/home/user/logs/job_100002.slurm_out",
+            slurm_err: "/home/user/logs/job_100002.slurm_err"
         },
         {
             job_id: 100003,
@@ -1166,7 +1342,9 @@
             status: "COMPLETED",
             preamble: "#!/bin/bash\n#SBATCH --job-name=model-sweep\n#SBATCH --time=00:30:00\n#SBATCH --mem=2G",
             start_time: "2024-01-15 08:00:00",
-            end_time: "2024-01-15 08:15:00"
+            end_time: "2024-01-15 08:15:00",
+            slurm_out: "/home/user/logs/job_100003.slurm_out",
+            slurm_err: "/home/user/logs/job_100003.slurm_err"
         },
         {
             job_id: 100004,
@@ -1176,7 +1354,9 @@
             status: "COMPLETED",
             preamble: "#!/bin/bash\n#SBATCH --job-name=model-sweep\n#SBATCH --time=00:30:00\n#SBATCH --mem=2G",
             start_time: "2024-01-15 08:00:00",
-            end_time: "2024-01-15 08:15:00"
+            end_time: "2024-01-15 08:15:00",
+            slurm_out: "/home/user/logs/job_100004.slurm_out",
+            slurm_err: "/home/user/logs/job_100004.slurm_err"
         },
         {
             job_id: 100005,
@@ -1186,7 +1366,9 @@
             status: "COMPLETED",
             preamble: "#!/bin/bash\n#SBATCH --job-name=model-sweep\n#SBATCH --time=00:30:00\n#SBATCH --mem=2G",
             start_time: "2024-01-15 08:00:00",
-            end_time: "2024-01-15 08:15:00"
+            end_time: "2024-01-15 08:15:00",
+            slurm_out: "/home/user/logs/job_100005.slurm_out",
+            slurm_err: "/home/user/logs/job_100005.slurm_err"
         },
         {
             job_id: 100006,
@@ -1196,7 +1378,9 @@
             status: "COMPLETED",
             preamble: "#!/bin/bash\n#SBATCH --job-name=model-sweep\n#SBATCH --time=00:30:00\n#SBATCH --mem=2G",
             start_time: "2024-01-15 08:00:00",
-            end_time: "2024-01-15 08:15:00"
+            end_time: "2024-01-15 08:15:00",
+            slurm_out: "/home/user/logs/job_100006.slurm_out",
+            slurm_err: "/home/user/logs/job_100006.slurm_err"
         }, 
         {
             job_id: 200001,
@@ -1206,7 +1390,9 @@
             status: "COMPLETED",
             preamble: "#!/bin/bash\n#SBATCH --job-name=train-llama\n#SBATCH --gres=gpu:2\n#SBATCH --time=04:00:00\n#SBATCH --mem=32G",
             start_time: "2024-01-15 08:30:00",
-            end_time: "2024-01-15 12:15:00"
+            end_time: "2024-01-15 12:15:00",
+            slurm_out: "/home/user/logs/job_200001.slurm_out",
+            slurm_err: "/home/user/logs/job_200001.slurm_err"
         },
         {
             job_id: 200002,
@@ -1216,7 +1402,9 @@
             status: "COMPLETED",
             preamble: "#!/bin/bash\n#SBATCH --job-name=train-llama\n#SBATCH --gres=gpu:2\n#SBATCH --time=04:00:00\n#SBATCH --mem=32G",
             start_time: "2024-01-15 08:30:00",
-            end_time: "2024-01-15 12:15:00"
+            end_time: "2024-01-15 12:15:00",
+            slurm_out: "/home/user/logs/job_200002.slurm_out",
+            slurm_err: "/home/user/logs/job_200002.slurm_err"
         },
         {
             job_id: 200003,
@@ -1226,6 +1414,8 @@
             status: "RUNNING",
             preamble: "#!/bin/bash\n#SBATCH --job-name=train-gpt\n#SBATCH --gres=gpu:4\n#SBATCH --time=06:00:00\n#SBATCH --mem=64G",
             start_time: "2024-01-15 08:30:00",
+            slurm_out: "/home/user/logs/job_200003.slurm_out",
+            slurm_err: "/home/user/logs/job_200003.slurm_err",
             stats: {
                 gpu_memory_used_mb: 45056,
                 gpu_memory_total_mb: 65536,
@@ -1241,6 +1431,8 @@
             status: "RUNNING",
             preamble: "#!/bin/bash\n#SBATCH --job-name=train-gpt\n#SBATCH --gres=gpu:4\n#SBATCH --time=06:00:00\n#SBATCH --mem=64G",
             start_time: "2024-01-15 08:30:00",
+            slurm_out: "/home/user/logs/job_200004.slurm_out",
+            slurm_err: "/home/user/logs/job_200004.slurm_err",
             stats: {
                 gpu_memory_used_mb: 45056,
                 gpu_memory_total_mb: 65536,
@@ -1254,9 +1446,12 @@
             group_name: "plot",
             depends_on: ["200002", "200004"],
             status: "PENDING",
-            preamble: "#!/bin/bash\n#SBATCH --job-name=plot-comparison\n#SBATCH --time=00:15:00\n#SBATCH --mem=4G"
+            preamble: "#!/bin/bash\n#SBATCH --job-name=plot-comparison\n#SBATCH --time=00:15:00\n#SBATCH --mem=4G",
+            slurm_out: "/home/user/logs/job_400001.slurm_out",
+            slurm_err: "/home/user/logs/job_400001.slurm_err"
         },
     ];
+
     // Global state
     let jobs = [];
     let allGroups = [];
@@ -1265,6 +1460,19 @@
     let isLoading = false;
     let librariesLoaded = false;
     let tooltip = null;
+
+    // Log viewer state
+    let logViewerState = {
+        isOpen: false,
+        currentJobId: null,
+        currentLogPath: null,
+        currentLogType: 'output',
+        isTailing: false,
+        autoScroll: false, // Changed from true to false
+        tailInterval: null,
+        lastLogLines: 0,
+        logContent: ''
+    };
 
     // Filter state
     let filters = {
@@ -1332,6 +1540,276 @@
         } finally {
             setLoading(false);
         }
+    }
+
+    // Log viewer functions
+    async function openLogViewer(jobId, logPath, logType = 'output') {
+        logViewerState.currentJobId = jobId;
+        logViewerState.currentLogPath = logPath;
+        logViewerState.currentLogType = logType;
+        logViewerState.isOpen = true;
+        logViewerState.logContent = '';
+        logViewerState.lastLogSize = 0;
+
+        // Update modal title with log type
+        const logTypeLabel = logType === 'error' ? 'Error Log' : 'Output Log';
+        document.getElementById('log-modal-title').textContent = `Job #${jobId} - ${logTypeLabel} (${logPath})`;
+        
+        // Clear log viewer
+        const logViewer = document.getElementById('log-viewer');
+        logViewer.value = '';
+        
+        // Show modal
+        document.getElementById('log-modal').classList.add('show');
+        
+        // Update status
+        updateLogStatus('connecting', 'Connecting...');
+        
+        // Load initial log content
+        await loadLogContent();
+    }
+
+    // Replace the loadLogContent function
+    async function loadLogContent() {
+        try {
+            const response = await fetch(`/api/logs/${logViewerState.currentJobId}?path=${encodeURIComponent(logViewerState.currentLogPath)}`);
+            
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            
+            const data = await response.json();
+            logViewerState.logContent = data.content || '';
+            logViewerState.lastLogLines = data.total_lines || 0;
+            
+            // Update log viewer
+            const logViewer = document.getElementById('log-viewer');
+            logViewer.value = logViewerState.logContent;
+            
+            // Auto scroll to bottom if enabled
+            if (logViewerState.autoScroll) {
+                logViewer.scrollTop = logViewer.scrollHeight;
+            }
+            
+            // Update status and info
+            updateLogStatus('connected', 'Connected');
+            updateLogInfo();
+            
+        } catch (error) {
+            console.error('Error loading log content:', error);
+            
+            // Fallback to demo content
+            const demoContent = generateDemoLogContent(logViewerState.currentJobId, logViewerState.currentLogType);
+            logViewerState.logContent = demoContent;
+            
+            const logViewer = document.getElementById('log-viewer');
+            logViewer.value = demoContent;
+            
+            if (logViewerState.autoScroll) {
+                logViewer.scrollTop = logViewer.scrollHeight;
+            }
+            
+            updateLogStatus('error', 'Failed to connect - showing demo content');
+            updateLogInfo();
+        }
+    }
+
+
+    function generateDemoLogContent(jobId, logType = 'output') {
+        const timestamp = new Date().toISOString();
+
+        return `No logs for job #${jobId} available. This is a demo log content.`
+        
+        if (logType === 'error') {
+            return `[${timestamp}] SLURM Error Log for Job #${jobId}
+[${timestamp}] slurmstepd: error: *** JOB ${jobId} ON node001 CANCELLED AT ${timestamp} ***
+[${timestamp}] srun: error: node001: task 0: Terminated
+[${timestamp}] Python traceback (most recent call last):
+[${timestamp}]   File "train.py", line 45, in <module>
+[${timestamp}]     model = load_model(args.model_path)
+[${timestamp}]   File "train.py", line 23, in load_model
+[${timestamp}]     return torch.load(model_path)
+[${timestamp}] FileNotFoundError: [Errno 2] No such file or directory: '/models/checkpoint_${jobId}.pt'
+[${timestamp}] CUDA out of memory. Tried to allocate 2.00 GiB (GPU 0; 39.59 GiB total capacity)
+[${timestamp}] slurmstepd: error: Detected 1 oom-kill event(s) in StepId=${jobId}.batch cgroup
+[${timestamp}] Job ${jobId} exceeded memory limit and was terminated`;
+        }
+        
+        // Return existing output log content for output type
+        return `[${timestamp}] SLURM Job #${jobId} started
+[${timestamp}] Loading environment...
+[${timestamp}] Python 3.9.7 | packaged by conda-forge
+[${timestamp}] CUDA Version: 11.8
+[${timestamp}] GPU 0: NVIDIA A100-SXM4-40GB (UUID: GPU-12345678-1234-1234-1234-123456789abc)
+[${timestamp}] Starting training script...
+[${timestamp}] Loading dataset from /data/train.csv
+[${timestamp}] Dataset loaded: 1,000,000 samples
+[${timestamp}] Model architecture: Transformer (110M parameters)
+[${timestamp}] Optimizer: AdamW (lr=1e-4, weight_decay=0.01)
+[${timestamp}] Starting training loop...
+[${timestamp}] Epoch 1/50 - Step 100/1000 - Loss: 2.345 - GPU Memory: 32GB/40GB
+[${timestamp}] Epoch 1/50 - Step 200/1000 - Loss: 2.123 - GPU Memory: 32GB/40GB
+[${timestamp}] Epoch 1/50 - Step 300/1000 - Loss: 1.987 - GPU Memory: 32GB/40GB
+[${timestamp}] Epoch 1/50 - Step 400/1000 - Loss: 1.876 - GPU Memory: 32GB/40GB
+[${timestamp}] Epoch 1/50 - Step 500/1000 - Loss: 1.765 - GPU Memory: 32GB/40GB
+[${timestamp}] Checkpointing model at step 500...
+[${timestamp}] Checkpoint saved to /checkpoints/model_step_500.pt
+[${timestamp}] Epoch 1/50 - Step 600/1000 - Loss: 1.654 - GPU Memory: 32GB/40GB
+[${timestamp}] Epoch 1/50 - Step 700/1000 - Loss: 1.543 - GPU Memory: 32GB/40GB
+[${timestamp}] Epoch 1/50 - Step 800/1000 - Loss: 1.432 - GPU Memory: 32GB/40GB
+[${timestamp}] Epoch 1/50 - Step 900/1000 - Loss: 1.321 - GPU Memory: 32GB/40GB
+[${timestamp}] Epoch 1/50 - Step 1000/1000 - Loss: 1.210 - GPU Memory: 32GB/40GB
+[${timestamp}] Epoch 1/50 completed - Average Loss: 1.654 - Time: 45m 23s
+[${timestamp}] Validation Loss: 1.543 - Validation Accuracy: 67.8%
+[${timestamp}] Starting Epoch 2/50...
+[${timestamp}] Training in progress...`;
+    }
+
+    // Replace the tailLogFile function
+    async function tailLogFile() {
+        if (!logViewerState.isTailing || !logViewerState.isOpen) {
+            return;
+        }
+
+        try {
+            const response = await fetch(`/api/logs/${logViewerState.currentJobId}?path=${encodeURIComponent(logViewerState.currentLogPath)}&start=${logViewerState.lastLogLines}`);
+            
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            
+            const data = await response.json();
+            
+            if (data.content && data.content.length > 0) {
+                logViewerState.logContent += data.content;
+                logViewerState.lastLogLines = data.total_lines || logViewerState.lastLogLines;
+                
+                const logViewer = document.getElementById('log-viewer');
+                logViewer.value = logViewerState.logContent;
+                
+                if (logViewerState.autoScroll) {
+                    logViewer.scrollTop = logViewer.scrollHeight;
+                }
+                
+                updateLogInfo();
+            }
+            
+        } catch (error) {
+            console.error('Error tailing log:', error);
+            
+            // Simulate new log lines for demo
+            if (Math.random() > 0.7) { // 30% chance of new content
+                const timestamp = new Date().toISOString();
+                const step = Math.floor(Math.random() * 1000) + 1;
+                const loss = (Math.random() * 2 + 0.5).toFixed(3);
+                const newLine = `\n[${timestamp}] Epoch 2/50 - Step ${step}/1000 - Loss: ${loss} - GPU Memory: 32GB/40GB`;
+                
+                logViewerState.logContent += newLine;
+                
+                const logViewer = document.getElementById('log-viewer');
+                logViewer.value = logViewerState.logContent;
+                
+                if (logViewerState.autoScroll) {
+                    logViewer.scrollTop = logViewer.scrollHeight;
+                }
+                
+                updateLogInfo();
+            }
+        }
+    }
+
+    function toggleTailing() {
+        logViewerState.isTailing = !logViewerState.isTailing;
+        logViewerState.autoScroll = logViewerState.isTailing; // Auto-scroll follows tailing state
+        
+        const tailBtn = document.getElementById('tail-toggle-btn');
+        const tailText = tailBtn.querySelector('span:last-child');
+
+        if (logViewerState.isTailing) {
+            tailText.textContent = 'Tail: ON';
+            tailBtn.classList.add('active');
+            updateLogStatus('connected', 'Tailing active (auto-scroll enabled)');
+            
+            // Start tailing interval
+            logViewerState.tailInterval = setInterval(tailLogFile, 2000);
+
+            // Scroll to bottom immediately when enabling tail
+            const logViewer = document.getElementById('log-viewer');
+            logViewer.scrollTop = logViewer.scrollHeight;
+        } else {
+            tailText.textContent = 'Tail: OFF';
+            tailBtn.classList.remove('active');
+            updateLogStatus('connected', 'Connected');
+            
+            // Clear tailing interval
+            if (logViewerState.tailInterval) {
+                clearInterval(logViewerState.tailInterval);
+                logViewerState.tailInterval = null;
+            }
+        }
+    }
+
+    function closeLogModal() {
+        logViewerState.isOpen = false;
+        logViewerState.isTailing = false;
+        logViewerState.autoScroll = false; // Reset to false
+        
+        // Clear tailing interval
+        if (logViewerState.tailInterval) {
+            clearInterval(logViewerState.tailInterval);
+            logViewerState.tailInterval = null;
+        }
+        
+        // Reset buttons
+        const tailBtn = document.getElementById('tail-toggle-btn');
+        const tailText = tailBtn.querySelector('span:last-child');
+        tailText.textContent = 'Tail: OFF';
+        tailBtn.classList.remove('active');
+        
+        // Hide modal
+        document.getElementById('log-modal').classList.remove('show');
+        
+        // Reset state
+        logViewerState.currentJobId = null;
+        logViewerState.currentLogPath = null;
+        logViewerState.logContent = '';
+        logViewerState.lastLogSize = 0;
+    }
+
+    function updateLogStatus(status, message) {
+        const statusDot = document.getElementById('log-status-dot');
+        const statusText = document.getElementById('log-status-text');
+        
+        statusDot.className = 'log-status-dot';
+        
+        switch (status) {
+            case 'connected':
+                statusDot.classList.add('connected');
+                break;
+            case 'error':
+                statusDot.classList.add('error');
+                break;
+            default:
+                break;
+        }
+        
+        statusText.textContent = message;
+    }
+
+    function updateLogInfo() {
+        const lines = logViewerState.logContent.split('\n').length;
+        const bytes = new Blob([logViewerState.logContent]).size;
+        
+        document.getElementById('log-lines').textContent = `${lines} lines`;
+        document.getElementById('log-size').textContent = `${formatBytes(bytes)}`;
+    }
+
+    function formatBytes(bytes) {
+        if (bytes === 0) return '0 bytes';
+        const k = 1024;
+        const sizes = ['bytes', 'KB', 'MB', 'GB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
     }
 
     // Loading and error state management
@@ -2095,6 +2573,30 @@
                     </div>
                 `;
             }
+
+            // Add log viewer buttons if slurm files exist
+            let logViewerButtons = '';
+            if (job.slurm_out || job.slurm_err) {
+                logViewerButtons = '<div class="log-buttons">';
+                
+                if (job.slurm_out) {
+                    logViewerButtons += `
+                        <button class="log-viewer-btn output-log" onclick="openLogViewer(${job.id}, '${job.slurm_out}', 'output')">
+                            📄 Output Log
+                        </button>
+                    `;
+                }
+                
+                if (job.slurm_err) {
+                    logViewerButtons += `
+                        <button class="log-viewer-btn error-log" onclick="openLogViewer(${job.id}, '${job.slurm_err}', 'error')">
+                            ⚠️ Error Log
+                        </button>
+                    `;
+                }
+                
+                logViewerButtons += '</div>';
+            }
             
             jobCard.innerHTML = `
                 <div class="job-header">
@@ -2111,9 +2613,9 @@
                     <div class="job-detail-item">
                         <div class="job-detail-label">Dependencies</div>
                         <div class="job-detail-value">
-                            ${job.parents.length > 0 ? 
+                            ${job.depends_on && job.depends_on.length > 0 ? 
                                 `<div class="dependency-list">
-                                    ${job.parents.map(dep => `<span class="dependency-tag">#${dep}</span>`).join('')}
+                                    ${job.depends_on.map(dep => `<span class="dependency-tag">#${dep}</span>`).join('')}
                                 </div>` :
                                 'None'
                             }
@@ -2138,6 +2640,7 @@
                 
                 ${resourceInfo}
                 ${errorInfo}
+                ${logViewerButtons}
             `;
             
             jobGrid.appendChild(jobCard);
@@ -2155,6 +2658,13 @@
     document.getElementById('modal').addEventListener('click', (e) => {
         if (e.target.id === 'modal') {
             closeModal();
+        }
+    });
+
+    // Close log modal when clicking outside
+    document.getElementById('log-modal').addEventListener('click', (e) => {
+        if (e.target.id === 'log-modal') {
+            closeLogModal();
         }
     });
 
