@@ -18,6 +18,7 @@ INACTIVE_PARENT_RULES = [
     lambda id, status, force: status in ["FAILED", "CANCELLED"] and force,
 ]
 
+
 class JobSubmitter(JobDB):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -63,7 +64,9 @@ class JobSubmitter(JobDB):
                 prev_jobs = self.get_jobs([f"command='{job.command}'"])
                 prev_job = prev_jobs[0] if prev_jobs else None
                 if prev_job and prev_job.status in ignore_statuses:
-                    print(f"Job {prev_job.id} already submitted with status {prev_job.status}.")
+                    print(
+                        f"Job {prev_job.id} already submitted with status {prev_job.status}."
+                    )
                     return prev_job.id
 
             # 3. Submit job (sbatch)
@@ -71,11 +74,14 @@ class JobSubmitter(JobDB):
             job.id = self._parse_job_id(result)
             print(f"Submitted job with ID {job.id}")
 
-
             # 4. Upsert job in the database
-            upsert_job = JobInsert(**{
-                k: v for k, v in job.to_dict().items() if k in JobInsert.__dataclass_fields__
-            })
+            upsert_job = JobInsert(
+                **{
+                    k: v
+                    for k, v in job.to_dict().items()
+                    if k in JobInsert.__dataclass_fields__
+                }
+            )
 
             # clean up
             if prev_job:
@@ -130,7 +136,7 @@ class JobSubmitter(JobDB):
                     parent_state = parent_states.get(parent_id, {})
                     if rule(parent_id, parent_state.get("status", ""), force):
                         job.inactive_parents.append(parent_id)
-            
+
             self._submit_job(
                 job, dry=False, ignore_statuses=ignore_statuses, prev_job_id=job_id
             )
@@ -176,7 +182,6 @@ class JobSubmitter(JobDB):
         group_id: Optional[str] = None,
         node_id: Optional[str] = None,
         node_name: str = "",
-
     ):
         """Recursively walk the job tree and submit jobs."""
         submit_fn = submit_fn if submit_fn is not None else self._submit_job
@@ -195,7 +200,6 @@ class JobSubmitter(JobDB):
                 node_id=node_id,
                 node_name=node_name,
                 parents=[str(_id) for _id in depends_on],
-
             )
             job.command = job.command.format(group_id=group_id)
             if debug:
@@ -212,6 +216,7 @@ class JobSubmitter(JobDB):
             sweep = node.sweep
             # Generate all combinations of the sweep parameters
             keys = list(sweep.keys())
+
             values = list(sweep.values())
             # Generate all combinations of the sweep parameters
             combinations = [dict(zip(keys, v)) for v in itertools.product(*values)]
@@ -229,7 +234,6 @@ class JobSubmitter(JobDB):
                     parents=[str(_id) for _id in depends_on],
                     node_id=node_id,
                     node_name=node_name,
-
                 )
                 if debug:
                     print(f"\nDEBUG:\n{job.to_script(self.deptype)}\n")
@@ -315,7 +319,7 @@ class JobSubmitter(JobDB):
                         # depends_on.extend(job_ids)
                         sequential_job_ids.extend(job_ids)
                         depends_on = copy.deepcopy(job_ids)
-            return sequential_job_ids[-1:] or sequential_job_ids 
+            return sequential_job_ids[-1:] or sequential_job_ids
 
         return submitted_jobs
 

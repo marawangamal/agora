@@ -619,7 +619,7 @@ class TestJrunSimple(unittest.TestCase):
         for i in range(1, len(job_ids_list)):
             self.assertEqual(
                 " ".join(jobs[i].parents),
-                " ".join([str(j) for j in job_ids_list[i-1:i]]),
+                " ".join([str(j) for j in job_ids_list[i - 1 : i]]),
             )
 
         # assert first two and second two have diff loop_ids
@@ -650,7 +650,7 @@ class TestJrunSimple(unittest.TestCase):
                 "type": "sequential",
                 "jobs": [
                     {
-                    "group": {
+                        "group": {
                             "name": "test-group-node-ids",
                             "type": "parallel",
                             "jobs": [
@@ -670,18 +670,17 @@ class TestJrunSimple(unittest.TestCase):
                         }
                     },
                     {
-                    "group": {
-                                "name": "test-group-node-ids",
-                                "type": "sweep",
-                                "preamble": "gpu",
-                                "sweep": {
-                                    "param1": [1, 2],
-                                },
-                                "sweep_template": "python test.py param1={param1} --group_id {group_id}",
-                            }
+                        "group": {
+                            "name": "test-group-node-ids",
+                            "type": "sweep",
+                            "preamble": "gpu",
+                            "sweep": {
+                                "param1": [1, 2],
+                            },
+                            "sweep_template": "python test.py param1={param1} --group_id {group_id}",
+                        }
                     },
-
-                ]
+                ],
             }
         }
 
@@ -695,8 +694,9 @@ class TestJrunSimple(unittest.TestCase):
 
         # Verify submission
         jobs = viewer.get_jobs()
-        self.assertEqual([j.node_id for j in jobs], [jobs[0].node_id] * 2 + [jobs[2].node_id] * 2)
-    
+        self.assertEqual(
+            [j.node_id for j in jobs], [jobs[0].node_id] * 2 + [jobs[2].node_id] * 2
+        )
 
     # @patch("os.popen")
     # def test_sbatch_args(self, mock_popen):
