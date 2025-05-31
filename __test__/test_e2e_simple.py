@@ -127,7 +127,7 @@ class TestJrunSimple(unittest.TestCase):
         ##### Submit jobs
         submitter.walk(
             node=submitter._parse_group_dict(root["group"]),
-            group_name=root["group"]["name"],
+            node_name=root["group"]["name"],
             preamble_map=preamble_map,
             depends_on=[],
             submitted_jobs=[],
@@ -208,7 +208,7 @@ class TestJrunSimple(unittest.TestCase):
         ##### Submit jobs
         submitter.walk(
             node=submitter._parse_group_dict(root["group"]),
-            group_name=root["group"]["name"],
+            node_name=root["group"]["name"],
             preamble_map=preamble_map,
             depends_on=[],
             submitted_jobs=[],
@@ -271,7 +271,7 @@ class TestJrunSimple(unittest.TestCase):
 
         submitter.walk(
             node=submitter._parse_group_dict(root["group"]),
-            group_name=root["group"]["name"],
+            node_name=root["group"]["name"],
             preamble_map=preamble_map,
         )
 
@@ -334,7 +334,7 @@ class TestJrunSimple(unittest.TestCase):
 
         submitter.walk(
             node=submitter._parse_group_dict(root["group"]),
-            group_name=root["group"]["name"],
+            node_name=root["group"]["name"],
             preamble_map=self.preamble_map,
             depends_on=[],
             submitted_jobs=[],
@@ -384,7 +384,7 @@ class TestJrunSimple(unittest.TestCase):
 
         submitter.walk(
             node=submitter._parse_group_dict(root["group"]),
-            group_name=root["group"]["name"],
+            node_name=root["group"]["name"],
             preamble_map=self.preamble_map,
             depends_on=[],
             submitted_jobs=[],
@@ -439,7 +439,7 @@ class TestJrunSimple(unittest.TestCase):
 
         submitter.walk(
             node=submitter._parse_group_dict(root["group"]),
-            group_name=root["group"]["name"],
+            node_name=root["group"]["name"],
             preamble_map=self.preamble_map,
             depends_on=[],
             submitted_jobs=[],
@@ -507,7 +507,7 @@ class TestJrunSimple(unittest.TestCase):
 
         submitter.walk(
             node=submitter._parse_group_dict(root["group"]),
-            group_name=root["group"]["name"],
+            node_name=root["group"]["name"],
             preamble_map=self.preamble_map,
             depends_on=[],
             submitted_jobs=[],
@@ -549,7 +549,7 @@ class TestJrunSimple(unittest.TestCase):
 
         submitter.walk(
             node=submitter._parse_group_dict(root["group"]),
-            group_name=root["group"]["name"],
+            node_name=root["group"]["name"],
             preamble_map=self.preamble_map,
             depends_on=[],
             submitted_jobs=[],
@@ -606,7 +606,7 @@ class TestJrunSimple(unittest.TestCase):
 
         submitter.walk(
             node=submitter._parse_group_dict(root["group"]),
-            group_name=root["group"]["name"],
+            node_name=root["group"]["name"],
             preamble_map=self.preamble_map,
             depends_on=[],
             submitted_jobs=[],
@@ -635,6 +635,68 @@ class TestJrunSimple(unittest.TestCase):
             jobs[1].node_id,
             f"Loop IDs should be the same for job {i} and {i + 1}",
         )
+
+    @patch("os.popen")
+    def test_node_ids_workflow(self, mock_popen):
+        """Test that jobs are submitted correctly with node IDs."""
+
+        ##### Setup mocks
+        mock_popen.side_effect = self.get_popen_mock_fn()
+        viewer = JobViewer(self.db_path)
+        submitter = JobSubmitter(self.db_path)
+        root = {
+            "group": {
+                "name": "test-group-node-ids",
+                "type": "sequential",
+                "jobs": [
+                    {
+                    "group": {
+                            "name": "test-group-node-ids",
+                            "type": "parallel",
+                            "jobs": [
+                                {
+                                    "job": {
+                                        "preamble": "base",
+                                        "command": "echo 'First job' --group_id {group_id}",
+                                    },
+                                },
+                                {
+                                    "job": {
+                                        "preamble": "gpu",
+                                        "command": "echo 'Second job' --group_id {group_id}",
+                                    },
+                                },
+                            ],
+                        }
+                    },
+                    {
+                    "group": {
+                                "name": "test-group-node-ids",
+                                "type": "sweep",
+                                "preamble": "gpu",
+                                "sweep": {
+                                    "param1": [1, 2],
+                                },
+                                "sweep_template": "python test.py param1={param1} --group_id {group_id}",
+                            }
+                    },
+
+                ]
+            }
+        }
+
+        submitter.walk(
+            node=submitter._parse_group_dict(root["group"]),
+            node_name=root["group"]["name"],
+            preamble_map=self.preamble_map,
+            depends_on=[],
+            submitted_jobs=[],
+        )
+
+        # Verify submission
+        jobs = viewer.get_jobs()
+        self.assertEqual([j.node_id for j in jobs], [jobs[0].node_id] * 2 + [jobs[2].node_id] * 2)
+    
 
     # @patch("os.popen")
     # def test_sbatch_args(self, mock_popen):
