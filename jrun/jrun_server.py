@@ -40,7 +40,7 @@ def create_app(default_db: str, web_folder: Path) -> Flask:
             
             if start is not None or end is not None:
                 lines = lines[start:end]
-            
+
             return jsonify({
                 "content": "".join(lines),
                 "total_lines": len(lines)

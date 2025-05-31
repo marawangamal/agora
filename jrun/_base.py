@@ -318,9 +318,6 @@ class JobDB:
             out_path, err_path = self._parse_preamble(row_dict.get("preamble", ""), row_dict["id"])
             row_dict["slurm_out"] = osp.join(job_states.get(row_dict["id"], {}).get("workdir", ""), out_path) if out_path else None
             row_dict["slurm_err"] = osp.join(job_states.get(row_dict["id"], {}).get("workdir", ""), err_path) if err_path else None
-
-            print(f"Job {row_dict['id']} - Slurm Out: {row_dict['slurm_out']}, Slurm Err: {row_dict['slurm_err']}")
-
             result.append(Job(**row_dict))
 
         return result

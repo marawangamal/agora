@@ -1529,33 +1529,34 @@
 
     function generateDemoLogContent(jobId) {
         const timestamp = new Date().toISOString();
-        return `[${timestamp}] SLURM Job #${jobId} started
-[${timestamp}] Loading environment...
-[${timestamp}] Python 3.9.7 | packaged by conda-forge
-[${timestamp}] CUDA Version: 11.8
-[${timestamp}] GPU 0: NVIDIA A100-SXM4-40GB (UUID: GPU-12345678-1234-1234-1234-123456789abc)
-[${timestamp}] Starting training script...
-[${timestamp}] Loading dataset from /data/train.csv
-[${timestamp}] Dataset loaded: 1,000,000 samples
-[${timestamp}] Model architecture: Transformer (110M parameters)
-[${timestamp}] Optimizer: AdamW (lr=1e-4, weight_decay=0.01)
-[${timestamp}] Starting training loop...
-[${timestamp}] Epoch 1/50 - Step 100/1000 - Loss: 2.345 - GPU Memory: 32GB/40GB
-[${timestamp}] Epoch 1/50 - Step 200/1000 - Loss: 2.123 - GPU Memory: 32GB/40GB
-[${timestamp}] Epoch 1/50 - Step 300/1000 - Loss: 1.987 - GPU Memory: 32GB/40GB
-[${timestamp}] Epoch 1/50 - Step 400/1000 - Loss: 1.876 - GPU Memory: 32GB/40GB
-[${timestamp}] Epoch 1/50 - Step 500/1000 - Loss: 1.765 - GPU Memory: 32GB/40GB
-[${timestamp}] Checkpointing model at step 500...
-[${timestamp}] Checkpoint saved to /checkpoints/model_step_500.pt
-[${timestamp}] Epoch 1/50 - Step 600/1000 - Loss: 1.654 - GPU Memory: 32GB/40GB
-[${timestamp}] Epoch 1/50 - Step 700/1000 - Loss: 1.543 - GPU Memory: 32GB/40GB
-[${timestamp}] Epoch 1/50 - Step 800/1000 - Loss: 1.432 - GPU Memory: 32GB/40GB
-[${timestamp}] Epoch 1/50 - Step 900/1000 - Loss: 1.321 - GPU Memory: 32GB/40GB
-[${timestamp}] Epoch 1/50 - Step 1000/1000 - Loss: 1.210 - GPU Memory: 32GB/40GB
-[${timestamp}] Epoch 1/50 completed - Average Loss: 1.654 - Time: 45m 23s
-[${timestamp}] Validation Loss: 1.543 - Validation Accuracy: 67.8%
-[${timestamp}] Starting Epoch 2/50...
-[${timestamp}] Training in progress...`;
+        return `No logs found for ${jobId}`
+//         return `[${timestamp}] SLURM Job #${jobId} started
+// [${timestamp}] Loading environment...
+// [${timestamp}] Python 3.9.7 | packaged by conda-forge
+// [${timestamp}] CUDA Version: 11.8
+// [${timestamp}] GPU 0: NVIDIA A100-SXM4-40GB (UUID: GPU-12345678-1234-1234-1234-123456789abc)
+// [${timestamp}] Starting training script...
+// [${timestamp}] Loading dataset from /data/train.csv
+// [${timestamp}] Dataset loaded: 1,000,000 samples
+// [${timestamp}] Model architecture: Transformer (110M parameters)
+// [${timestamp}] Optimizer: AdamW (lr=1e-4, weight_decay=0.01)
+// [${timestamp}] Starting training loop...
+// [${timestamp}] Epoch 1/50 - Step 100/1000 - Loss: 2.345 - GPU Memory: 32GB/40GB
+// [${timestamp}] Epoch 1/50 - Step 200/1000 - Loss: 2.123 - GPU Memory: 32GB/40GB
+// [${timestamp}] Epoch 1/50 - Step 300/1000 - Loss: 1.987 - GPU Memory: 32GB/40GB
+// [${timestamp}] Epoch 1/50 - Step 400/1000 - Loss: 1.876 - GPU Memory: 32GB/40GB
+// [${timestamp}] Epoch 1/50 - Step 500/1000 - Loss: 1.765 - GPU Memory: 32GB/40GB
+// [${timestamp}] Checkpointing model at step 500...
+// [${timestamp}] Checkpoint saved to /checkpoints/model_step_500.pt
+// [${timestamp}] Epoch 1/50 - Step 600/1000 - Loss: 1.654 - GPU Memory: 32GB/40GB
+// [${timestamp}] Epoch 1/50 - Step 700/1000 - Loss: 1.543 - GPU Memory: 32GB/40GB
+// [${timestamp}] Epoch 1/50 - Step 800/1000 - Loss: 1.432 - GPU Memory: 32GB/40GB
+// [${timestamp}] Epoch 1/50 - Step 900/1000 - Loss: 1.321 - GPU Memory: 32GB/40GB
+// [${timestamp}] Epoch 1/50 - Step 1000/1000 - Loss: 1.210 - GPU Memory: 32GB/40GB
+// [${timestamp}] Epoch 1/50 completed - Average Loss: 1.654 - Time: 45m 23s
+// [${timestamp}] Validation Loss: 1.543 - Validation Accuracy: 67.8%
+// [${timestamp}] Starting Epoch 2/50...
+// [${timestamp}] Training in progress...`;
     }
 
     // Replace the tailLogFile function
