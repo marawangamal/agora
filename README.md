@@ -185,9 +185,10 @@ group:
 - [x] Improve dependency (make markovian)
 - [x] View job logs in browser
 - [x] Delete by node
+- [x] Add sweep_idx
 
 ## Planned Features
-- [ ] Add loop_idx and sweep_idx
+- [ ] Bugfix: retry not auto updating old job id to new id in deps table
 - [ ] Update afterany (allow some parent group failures)
 - [ ] Update node color code (mixed with pending should be blue/active)
 
