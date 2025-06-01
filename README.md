@@ -184,9 +184,11 @@ group:
 - [x] Improve visual for loop group
 - [x] Improve dependency (make markovian)
 - [x] View job logs in browser
+- [x] Delete by node
+- [x] Add sweep_idx
 
 ## Planned Features
-- [ ] Delete and retry entire node/group -- parallel group to also use `node_id` and remove frontend signature logic
+- [ ] Bugfix: retry not auto updating old job id to new id in deps table
 - [ ] Update afterany (allow some parent group failures)
 - [ ] Update node color code (mixed with pending should be blue/active)
 

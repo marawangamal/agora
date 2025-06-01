@@ -35,6 +35,7 @@ class JobSubmitter(JobDB):
         self,
         job: Job,
         dry: bool = False,
+        debug: bool = False,
         ignore_statuses: List[str] = ["PENDING", "RUNNING", "COMPLETED"],
         prev_job_id: Optional[str] = None,
     ):
@@ -45,6 +46,10 @@ class JobSubmitter(JobDB):
         Returns:
             The job ID as a string
         """
+
+        if debug:
+            print(f"\nDEBUG:\n{job.to_script(self.deptype)}\n")
+            return "debug-job-id"
 
         if dry:
             job.command += " --dry"
@@ -138,7 +143,7 @@ class JobSubmitter(JobDB):
                     job.id, on_delete=lambda id: self.cancel(id), cascade=True
                 )
 
-    def retry(self, job_id: str, force: bool = False):
+    def retry(self, job_id: str, force: bool = False, debug: bool = False):
         """Retry a job with the given job ID."""
         job = self.get_jobs([f"id={job_id}"])[0]
         parent_states = self.get_job_states(job.parents)
@@ -155,7 +160,11 @@ class JobSubmitter(JobDB):
                         job.inactive_parents.append(parent_id)
 
             self._submit_job(
-                job, dry=False, ignore_statuses=ignore_statuses, prev_job_id=job_id
+                job,
+                dry=False,
+                ignore_statuses=ignore_statuses,
+                prev_job_id=job_id,
+                debug=debug,
             )
 
             # Get children -- should be resubmitted too
@@ -243,7 +252,7 @@ class JobSubmitter(JobDB):
             # Iterate over the combinations
             for i, params in enumerate(combinations):
                 job_id = f"{random.randint(100000, 999999)}"
-                cmd = cmd_template.format(**params, group_id=group_id)
+                cmd = cmd_template.format(**params, group_id=group_id, sidx=i)
                 job = Job(
                     id=job_id,
                     command=cmd,
@@ -252,6 +261,7 @@ class JobSubmitter(JobDB):
                     node_id=node_id,
                     node_name=node_name,
                 )
+
                 if debug:
                     print(f"\nDEBUG:\n{job.to_script(self.deptype)}\n")
                 else:

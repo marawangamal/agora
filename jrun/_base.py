@@ -1,3 +1,4 @@
+from contextlib import contextmanager
 import os
 import os.path as osp
 import re
@@ -54,8 +55,8 @@ class JobDB:
             parent TEXT NOT NULL,
             child TEXT NOT NULL,
             dep_type TEXT NOT NULL,
-            FOREIGN KEY (parent) REFERENCES jobs(job_id) ON DELETE CASCADE ON UPDATE CASCADE, -- delete record if parent is deleted
-            FOREIGN KEY (child) REFERENCES jobs(job_id) ON DELETE CASCADE ON UPDATE CASCADE, -- delete record if child is deleted
+            FOREIGN KEY (parent) REFERENCES jobs(id) ON DELETE CASCADE ON UPDATE CASCADE, -- delete record if parent is deleted
+            FOREIGN KEY (child) REFERENCES jobs(id) ON DELETE CASCADE ON UPDATE CASCADE, -- delete record if child is deleted
             UNIQUE (parent, child, dep_type)
         )
         """
@@ -74,87 +75,13 @@ class JobDB:
         conn.commit()
         conn.close()
 
-    # @staticmethod
-    # def _get_job_statuses(
-    #     job_ids: list, on_add_status: Optional[Callable[[str], str]] = None
-    # ) -> Dict[str, str]:
-    #     """Get the status of a list of job IDs."""
-
-    #     def fmt_job_id(job_id: Union[str, int, float]):
-    #         """Get the job ID as a string."""
-    #         # Could be a NaN
-    #         if isinstance(job_id, float) and job_id != job_id:
-    #             return "NaN"
-    #         else:
-    #             return str(job_id)
-
-    #     statuses = {}
-    #     formatted_job_ids = [fmt_job_id(job_id) for job_id in job_ids]
-
-    #     if not formatted_job_ids:
-    #         return statuses
-
-    #     try:
-    #         # Get all job statuses and reasons in one call
-    #         job_list = ",".join(formatted_job_ids)
-    #         out = os.popen(
-    #             f"squeue -j {job_list} --format='%i %T %r' --noheader"
-    #         ).read()
-
-    #         # Parse squeue output
-    #         for line in out.strip().split("\n"):
-    #             if line.strip():
-    #                 parts = line.strip().split()
-    #                 if len(parts) >= 2:
-    #                     job_id = parts[0]
-    #                     status = parts[1]
-    #                     reason = " ".join(parts[2:]) if len(parts) > 2 else ""
-
-    #                     # Convert PENDING with DependencyNeverSatisfied to BLOCKED
-    #                     if status == "PENDING" and "DependencyNeverSatisfied" in reason:
-    #                         status = "BLOCKED"
-
-    #                     statuses[job_id] = (
-    #                         on_add_status(status) if on_add_status else status
-    #                     )
-
-    #         # For jobs not found in squeue (completed, failed, etc), fall back to sacct
-    #         missing_jobs = set(formatted_job_ids) - set(statuses.keys())
-    #         for job_id in missing_jobs:
-    #             try:
-    #                 out = os.popen(
-    #                     f"sacct -j {job_id} --format state --noheader"
-    #                 ).read()
-    #                 status = out.strip().split("\n")[0].strip()
-    #                 statuses[job_id] = (
-    #                     on_add_status(status) if on_add_status else status
-    #                 )
-    #             except:
-    #                 statuses[job_id] = "UNKNOWN"
-
-    #     except:
-    #         # Fallback to individual sacct calls if squeue fails
-    #         for job_id in formatted_job_ids:
-    #             try:
-    #                 out = os.popen(
-    #                     f"sacct -j {job_id} --format state --noheader"
-    #                 ).read()
-    #                 status = out.strip().split("\n")[0].strip()
-    #                 statuses[job_id] = (
-    #                     on_add_status(status) if on_add_status else status
-    #                 )
-    #             except:
-    #                 statuses[job_id] = "UNKNOWN"
-
-    #     return statuses
-
     @staticmethod
     def get_job_states(job_ids: list) -> Dict[str, Dict[str, str]]:
         job_list = ",".join(str(j) for j in job_ids)
         output = os.popen(
             f"sacct -j {job_list} --format jobid,state,start,end,workdir --noheader --parsable2"
         ).read()
-        return {
+        job_states = {
             parts[0]: {
                 "status": parts[1],
                 "start": parts[2],
@@ -164,6 +91,17 @@ class JobDB:
             for line in output.strip().split("\n")
             if (parts := line.split("|")) and len(parts) >= 4
         }
+
+        # Check if pending jobs are blocked
+        for job_id, jstate in job_states.items():
+            if jstate["status"] == "PENDING":
+                pd_reason = (
+                    os.popen(f"squeue -j {job_id} -o %R --noheader").read().strip()
+                )
+                if "DependencyNeverSatisfied".lower() in pd_reason.lower():
+                    jstate["status"] = "BLOCKED"
+
+        return job_states
 
     def _parse_group_dict(self, d: Dict[str, Any]) -> PGroup:
         """Convert the `group` sub-dict into a PGroup (recursive)."""
@@ -195,14 +133,14 @@ class JobDB:
         )
 
     @staticmethod
-    def _parse_filter(filter_str: str) -> Tuple[str, Any]:
+    def _parse_filter(filter_str: str, param_name: str) -> Tuple[str, Any]:
         """Parse filter like 'status=COMPLETED' or 'command~python'"""
         if "~" in filter_str:
             field, value = filter_str.split("~", 1)
-            return f"{field} LIKE ?", f"%{value}%"
+            return f"{field} LIKE :{param_name}", f"%{value}%"
         elif "=" in filter_str:
             field, value = filter_str.split("=", 1)
-            return f"{field} = ?", value
+            return f"{field} = :{param_name}", value
         else:
             raise ValueError(f"Invalid filter: {filter_str}")
 
@@ -219,14 +157,41 @@ class JobDB:
                 error_path = error_path.replace(spec, job_id)
         return output_path, error_path
 
-    def _run_query(self, query: str, params: List[Any] = []) -> List[sqlite3.Row]:
+    @contextmanager
+    def get_connection(self):
+        """Get a database connection context manager with foreign keys enabled."""
         conn = sqlite3.connect(self.db_path)
-        conn.row_factory = sqlite3.Row
-        cursor = conn.cursor()
-        cursor.execute(query, params)
-        rows = cursor.fetchall()
-        conn.close()
-        return rows
+        conn.execute("PRAGMA foreign_keys = ON")
+        try:
+            yield conn
+            conn.commit()  # Auto-commit on success
+        except Exception:
+            conn.rollback()  # Rollback on error
+            raise
+        finally:
+            conn.close()  # Always close
+
+    def _run_query(
+        self, query: str, params: Optional[Dict] = None
+    ) -> List[sqlite3.Row]:
+        """Execute a SELECT query that returns data."""
+        with self.get_connection() as conn:
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
+            if params is None:
+                cursor.execute(query)
+            else:
+                cursor.execute(query, params)  # Named parameters
+            return cursor.fetchall()
+
+    def _execute_query(self, query: str, params: Optional[Dict] = None) -> None:
+        """Execute an INSERT/UPDATE/DELETE query that doesn't return data."""
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            if params is None:
+                cursor.execute(query)
+            else:
+                cursor.execute(query, params)  # Named parameters
 
     ############################################################################
     #                                CRUD operations (jobs)                    #
@@ -234,14 +199,11 @@ class JobDB:
 
     def create_job(self, rec: JobInsert) -> None:
         """Insert a new job row (fails if job_id already exists)."""
-        values = rec.to_dict()
-        columns = ", ".join(values.keys())
-        placeholders = ", ".join(f":{k}" for k in values.keys())
-
-        with sqlite3.connect(self.db_path) as conn:
-            cur = conn.cursor()
-            cur.execute(f"INSERT INTO jobs ({columns}) VALUES ({placeholders})", values)
-            conn.commit()
+        job_dict = rec.to_dict()
+        attrs_str = ", ".join(job_dict.keys())
+        vals_str = ", ".join(f":{k}" for k in job_dict.keys())
+        query = f"INSERT INTO jobs ({attrs_str}) VALUES ({vals_str})"
+        self._execute_query(query, job_dict)
 
     def delete_job(
         self,
@@ -256,14 +218,9 @@ class JobDB:
             print(f"Job {job_id} not found, nothing to delete.")
             return
 
-        with sqlite3.connect(self.db_path) as conn:
-            cur = conn.cursor()
-            cur.execute(
-                "DELETE FROM jobs WHERE id = ?",
-                (str(job_id),),
-            )
-            conn.commit()
-            on_delete(job_id) if on_delete else None
+        # Delete job from db
+        self._execute_query("DELETE FROM jobs WHERE id = :job_id", {"job_id": job_id})
+        on_delete(job_id) if on_delete else None
 
         if cascade:
             for child_id in job.children:
@@ -271,36 +228,33 @@ class JobDB:
 
     def update_job(self, job_id: str, job: JobInsert) -> None:
         """Update job fields. Only updates fields that are provided."""
-        set_clause = ", ".join(f"{k} = ?" for k in job.to_dict().keys())
-        params = list(job.to_dict().values()) + [job_id]
-
-        query = (
-            f"UPDATE jobs SET {set_clause}, updated_at = datetime('now') WHERE id = ?"
-        )
-
-        with sqlite3.connect(self.db_path) as conn:
-            cur = conn.cursor()
-            cur.execute(query, params)
-            conn.commit()
+        job_dict = job.to_dict()
+        set_clause = ", ".join(f"{k} = :{k}" for k in job_dict.keys())
+        query = f"UPDATE jobs SET {set_clause}, updated_at = datetime('now') WHERE id = :old_id"
+        params = {**job_dict, "old_id": job_id}
+        self._execute_query(query, params)
 
     def get_jobs(
         self, filters: Optional[List[str]] = None, ignore_status: bool = False
     ) -> List[Job]:
-        """Get jobs with optional filters."""
         query = "SELECT * FROM vw_jobs"
-        params = []
+        params = {}
 
         # Remove status from filters
         status_filter = None
         if filters:
             conditions = []
+            param_counter = 0
             for f in filters:
                 if f.startswith("status"):
                     status_filter = f
                     continue
-                condition, param = self._parse_filter(f)
+
+                param_name = f"param_{param_counter}"
+                condition, param_value = self._parse_filter(f, param_name)
                 conditions.append(condition)
-                params.append(param)
+                params[param_name] = param_value
+                param_counter += 1
 
             if conditions:
                 query += " WHERE " + " AND ".join(conditions)
@@ -319,7 +273,7 @@ class JobDB:
 
         # Filter out jobs based on status filter
         if status_filter:
-            field, value = self._parse_filter(status_filter)
+            _, value = self._parse_filter(status_filter, "status")
             jobs = [
                 job
                 for job in jobs
@@ -376,58 +330,15 @@ class JobDB:
         dep_type: Literal["afterok", "afterany"] = "afterok",
     ) -> None:
         """Update dependencies for a job."""
-        with sqlite3.connect(self.db_path) as conn:
-            cur = conn.cursor()
 
-            # Delete existing dependencies for this child
-            cur.execute(
-                "DELETE FROM deps WHERE child = ?",
-                (child_id,),
+        # Delete existing dependencies for this child
+        self._execute_query(
+            "DELETE FROM deps WHERE child = :child_id", {"child_id": child_id}
+        )
+
+        # Insert new dependencies
+        for parent_id in parent_ids:
+            self._execute_query(
+                "INSERT OR IGNORE INTO deps (parent, child, dep_type) VALUES (:parent_id, :child_id, :dep_type)",
+                {"parent_id": parent_id, "child_id": child_id, "dep_type": dep_type},
             )
-
-            # Insert new dependencies
-            for parent_id in parent_ids:
-                cur.execute(
-                    "INSERT OR IGNORE INTO deps (parent, child, dep_type) VALUES (?, ?, ?)",
-                    (parent_id, child_id, dep_type),
-                )
-            conn.commit()
-
-    # def update_depends_on(self, new_job_id: int, old_job_id: int) -> None:
-    #     """Update all jobs that depend on old_job_id to depend on new_job_id instead."""
-    #     conn = sqlite3.connect(self.db_path)
-    #     cursor = conn.cursor()
-
-    #     # Get all jobs with their dependencies
-    #     cursor.execute("SELECT job_id, depends_on FROM jobs")
-    #     jobs = cursor.fetchall()
-
-    #     updated_count = 0
-    #     now = datetime.datetime.utcnow().isoformat(timespec="seconds")
-
-    #     for job_id, depends_on_json in jobs:
-    #         # Parse the JSON list (handle empty/null case)
-    #         depends_on = json.loads(depends_on_json) if depends_on_json else []
-
-    #         # Check if this job depends on the old job ID
-    #         old_job_str = str(old_job_id)
-    #         new_job_str = str(new_job_id)
-
-    #         if old_job_str in depends_on:
-    #             # Replace old job ID with new job ID
-    #             updated_depends_on = [
-    #                 new_job_str if dep == old_job_str else dep for dep in depends_on
-    #             ]
-
-    #             # Update the database
-    #             cursor.execute(
-    #                 "UPDATE jobs SET depends_on = ?, updated_at = ? WHERE job_id = ?",
-    #                 (json.dumps(updated_depends_on), now, job_id),
-    #             )
-    #             updated_count += 1
-    #             print(f"Updated job {job_id}: dependency {old_job_id} -> {new_job_id}")
-
-    #     conn.commit()
-    #     conn.close()
-
-    #     print(f"Updated dependencies for {updated_count} jobs")

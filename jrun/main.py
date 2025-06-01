@@ -133,6 +133,9 @@ def parse_args():
     p_retry.add_argument(
         "--deptype", choices=["afterok", "afterany"], default="afterok"
     )
+    p_retry.add_argument(
+        "--debug", action="store_true", help="Don't call sbatch, just print & record"
+    )
 
     ###### jrun serve (start web interface)
     p_serve = sub.add_parser("serve", help="Start Next.js web interface server")
@@ -203,7 +206,7 @@ def main():
     elif args.cmd == "retry":
         jr = JobSubmitter(args.db, deptype=args.deptype)
         for job_id in args.job_ids:
-            jr.retry(job_id, force=args.force)
+            jr.retry(job_id, force=args.force, debug=args.debug)
 
     # Show job statuses
     elif args.cmd == "status":
