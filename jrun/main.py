@@ -54,7 +54,7 @@ def parse_args():
     p_status = sub.add_parser("status", help="Show job status table")
     p_status.add_argument("--db", default=default_db, help="SQLite DB path")
     p_status.add_argument(
-        "--filters",
+        "filters",
         nargs="*",
         help="Filter jobs (e.g, job_id=123  or command~train)",
         default=None,

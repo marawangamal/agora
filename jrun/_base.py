@@ -112,6 +112,7 @@ class JobDB:
         children: List[Union[PGroup, PJob]] = []
         name = d.get("name", "")
         loop_count = d.get("loop_count", 1)
+        loop_type = d.get("loop_type", "sequential")
 
         for item in d.get("jobs", []):
             if "job" in item:  # leaf
@@ -130,6 +131,7 @@ class JobDB:
             preamble=preamble,
             name=name,
             loop_count=loop_count,
+            loop_type=loop_type,
         )
 
     @staticmethod
@@ -203,7 +205,11 @@ class JobDB:
         attrs_str = ", ".join(job_dict.keys())
         vals_str = ", ".join(f":{k}" for k in job_dict.keys())
         query = f"INSERT INTO jobs ({attrs_str}) VALUES ({vals_str})"
-        self._execute_query(query, job_dict)
+        try:
+            self._execute_query(query, job_dict)
+        except sqlite3.IntegrityError as e:
+            print(f"Failed to execute query: {query} with params {job_dict}")
+            raise e
 
     def delete_job(
         self,

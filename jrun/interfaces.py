@@ -109,4 +109,5 @@ class PGroup:
     sweep: Dict[str, List[Any]] = field(default_factory=dict)
     sweep_template: str = ""
     loop_count: int = 1
+    loop_type: Literal["parallel", "sequential"] = "sequential"
     name: str = ""

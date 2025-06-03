@@ -208,6 +208,7 @@ class JobSubmitter(JobDB):
         group_id: Optional[str] = None,
         node_id: Optional[str] = None,
         node_name: str = "",
+        loop_idx: Optional[int] = None,
     ):
         """Recursively walk the job tree and submit jobs."""
         submit_fn = submit_fn if submit_fn is not None else self._submit_job
@@ -219,20 +220,24 @@ class JobSubmitter(JobDB):
             # Leaf node
             # generate rand job id int
             job_id = f"{random.randint(100000, 999999)}"
+            cmd = node.command.format(group_id=group_id, loop_idx=loop_idx)
             job = Job(
                 id=job_id,
-                command=node.command,
+                command=cmd,
                 preamble=preamble_map.get(node.preamble, ""),
-                node_id=node_id,
+                node_id=copy.deepcopy(node_id),
                 node_name=node_name,
                 parents=[str(_id) for _id in depends_on],
             )
-            job.command = job.command.format(group_id=group_id)
+            # job.command = job.command.format(group_id=group_id)
             if debug:
-                print(f"\nDEBUG:\n{job.to_script(self.deptype)}\n")
+                print(f"\nDEBUG:\n{job.to_script(self.deptype)}")
+                print(f"NODE_ID: {node_id} | GROUP_ID: {group_id}\n")
+                print("-" * 20)
             else:
                 job_id = submit_fn(job)
             submitted_jobs.append(job_id)
+
             return [job_id]
 
         # Base case (sweep)
@@ -252,18 +257,20 @@ class JobSubmitter(JobDB):
             # Iterate over the combinations
             for i, params in enumerate(combinations):
                 job_id = f"{random.randint(100000, 999999)}"
-                cmd = cmd_template.format(**params, group_id=group_id, sidx=i)
+                cmd = cmd_template.format(**params, group_id=group_id, sweep_idx=i)
                 job = Job(
                     id=job_id,
                     command=cmd,
                     preamble=preamble_map.get(node.preamble, ""),
                     parents=[str(_id) for _id in depends_on],
-                    node_id=node_id,
+                    node_id=copy.deepcopy(node_id),
                     node_name=node_name,
                 )
 
                 if debug:
-                    print(f"\nDEBUG:\n{job.to_script(self.deptype)}\n")
+                    print(f"\nDEBUG:\n{job.to_script(self.deptype)}")
+                    print(f"NODE_ID: {node_id} | GROUP_ID: {group_id}\n")
+                    print("-" * 20)
                 else:
                     job_id = submit_fn(job)
                 submitted_jobs.append(job_id)
@@ -287,7 +294,9 @@ class JobSubmitter(JobDB):
                     submitted_jobs=submitted_jobs,
                     submit_fn=submit_fn,
                     group_id=copy.deepcopy(group_id),
-                    node_name=group_name_i,
+                    node_name=copy.deepcopy(group_name_i),
+                    node_id=copy.deepcopy(node_id),
+                    loop_idx=copy.deepcopy(loop_idx),
                 )
                 if job_ids:
                     depends_on = copy.deepcopy(job_ids)
@@ -296,9 +305,6 @@ class JobSubmitter(JobDB):
         elif node.type == "parallel":
             # Parallel group
             parallel_job_ids = []
-            node_id = (
-                f"{random.randint(100000, 999999)}" if node_id is None else node_id
-            )
             for entry in node.jobs:
                 group_name_i = ":".join(
                     [p for p in [copy.deepcopy(node_name), entry.name] if p]
@@ -311,8 +317,9 @@ class JobSubmitter(JobDB):
                     submitted_jobs=submitted_jobs,
                     submit_fn=submit_fn,
                     group_id=copy.deepcopy(group_id),
-                    node_name=group_name_i,
-                    node_id=node_id,
+                    node_name=copy.deepcopy(group_name_i),
+                    node_id=copy.deepcopy(node_id),
+                    loop_idx=copy.deepcopy(loop_idx),
                 )
                 if job_ids:
                     parallel_job_ids.extend(job_ids)
@@ -320,10 +327,8 @@ class JobSubmitter(JobDB):
 
         elif node.type == "loop":
             # Sequential group
-            sequential_job_ids = []
-            node_id = (
-                f"{random.randint(100000, 999999)}" if node_id is None else node_id
-            )
+            loop_node_ids = []
+            node_id = f"{random.randint(100000, 999999)}"
             for t in range(node.loop_count):
                 for i, entry in enumerate(node.jobs):
                     group_name_i = ":".join(
@@ -339,14 +344,21 @@ class JobSubmitter(JobDB):
                         submitted_jobs=submitted_jobs,
                         submit_fn=submit_fn,
                         group_id=copy.deepcopy(group_id),
-                        node_name=group_name_i,
-                        node_id=node_id,
+                        node_name=copy.deepcopy(group_name_i),
+                        node_id=copy.deepcopy(node_id),
+                        loop_idx=copy.deepcopy(t),
                     )
                     if job_ids:
-                        # depends_on.extend(job_ids)
-                        sequential_job_ids.extend(job_ids)
-                        depends_on = copy.deepcopy(job_ids)
-            return sequential_job_ids[-1:] or sequential_job_ids
+                        loop_node_ids.extend(job_ids)
+                        if node.loop_type == "sequential":
+                            depends_on = copy.deepcopy(job_ids)
+
+            deps = (
+                loop_node_ids[-1:] or loop_node_ids
+                if node.loop_type == "sequential"
+                else loop_node_ids
+            )
+            return deps
 
         return submitted_jobs
 
