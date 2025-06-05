@@ -363,18 +363,18 @@ class JobSubmitter(JobDB):
         return submitted_jobs
 
     def sbatch(self, args: list):
-        raise NotImplementedError("The sbatch method is not implemented")
-        # # Call sbatch with the provided arguments
-        # result = subprocess.run(
-        #     ["sbatch"] + args, check=True, capture_output=True, text=True
-        # ).stdout.strip()
-        # job_id = self._parse_job_id(result)
-        # self.insert_record(
-        #     Job(
-        #         job_id=job_id,
-        #         group_name="sbatch",
-        #         command=" ".join(args),
-        #         preamble="",
-        #         depends_on=[],
-        #     )
-        # )
+        result = subprocess.run(
+            ["sbatch"] + args, check=True, capture_output=True, text=True
+        ).stdout.strip()
+        print(result)
+        job_id = self._parse_job_id(result)
+        self.create_job(
+            JobInsert(
+                id=job_id,
+                node_name="sbatch",
+                command=" ".join(args),
+                preamble="",
+                created_at=time.strftime("%Y-%m-%d %H:%M:%S"),
+                updated_at=time.strftime("%Y-%m-%d %H:%M:%S"),
+            )
+        )
