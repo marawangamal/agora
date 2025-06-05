@@ -2029,6 +2029,47 @@
         applyFilters();
       }
 
+      // Add this function right before applyFilters()
+      function getFilteredJobsForGroup(group) {
+        return group.jobs.filter((job) => {
+          // Search filter
+          if (filters.search) {
+            const searchMatch =
+              job.id.toString().includes(filters.search) ||
+              job.command.toLowerCase().includes(filters.search) ||
+              job.node_name.toLowerCase().includes(filters.search);
+            if (!searchMatch) return false;
+          }
+
+          // Status filter
+          if (filters.statuses.size > 0) {
+            if (!filters.statuses.has(job.status)) return false;
+          }
+
+          // Group filter
+          if (filters.groups.size > 0) {
+            if (!filters.groups.has(job.node_name)) return false;
+          }
+
+          // Dependency filter
+          if (filters.dependencies.size > 0) {
+            let dependencyMatch = false;
+            if (filters.dependencies.has("has-deps")) {
+              dependencyMatch = dependencyMatch || job.parents.length > 0;
+            }
+            if (filters.dependencies.has("no-deps")) {
+              dependencyMatch = dependencyMatch || job.parents.length === 0;
+            }
+            if (filters.dependencies.has("root")) {
+              dependencyMatch = dependencyMatch || job.parents.length === 0;
+            }
+            if (!dependencyMatch) return false;
+          }
+
+          return true;
+        });
+      }
+
       function applyFilters() {
         // Update search filter
         filters.search = document
@@ -2550,13 +2591,30 @@
 
           // Add event listeners
           cy.on("tap", "node", function (evt) {
+            // const node = evt.target;
+            // const group = {
+            //   jobs: node.data("jobs"),
+            //   displayText: node.data("displayText"),
+            //   groupName: node.data("groupName"),
+            // };
+            //  showGroupDetails(group);
+
             const node = evt.target;
-            const group = {
+            const originalGroup = {
               jobs: node.data("jobs"),
               displayText: node.data("displayText"),
               groupName: node.data("groupName"),
             };
-            showGroupDetails(group);
+
+            // Filter the jobs based on current filters
+            const filteredJobs = getFilteredJobsForGroup(originalGroup);
+
+            const filteredGroup = {
+              ...originalGroup,
+              jobs: filteredJobs,
+            };
+
+            showGroupDetails(filteredGroup);
           });
 
           // Add hover event listeners for simplified tooltips
@@ -2689,12 +2747,28 @@
           (j) => j.status === "PENDING"
         ).length;
 
+        // document.getElementById("modal-subtitle").innerHTML = `
+        //     <span>${group.groupName}</span>
+        //     <span>•</span>
+        //     <span>${group.jobs.length} jobs</span>
+        //     <span>•</span>
+        //     <span class="status-${groupStatus.toLowerCase()}">${groupStatus}</span>
+        // `;
+
+        // Check if we're showing filtered results
+        const isFiltered =
+          filters.search ||
+          filters.statuses.size > 0 ||
+          filters.groups.size > 0 ||
+          filters.dependencies.size > 0;
+        const filterIndicator = isFiltered ? " (filtered)" : "";
+
         document.getElementById("modal-subtitle").innerHTML = `
-            <span>${group.groupName}</span>
-            <span>•</span>
-            <span>${group.jobs.length} jobs</span>
-            <span>•</span>
-            <span class="status-${groupStatus.toLowerCase()}">${groupStatus}</span>
+          <span>${group.groupName}${filterIndicator}</span>
+          <span>•</span>
+          <span>${group.jobs.length} jobs</span>
+          <span>•</span>
+          <span class="status-${groupStatus.toLowerCase()}">${groupStatus}</span>
         `;
 
         document.getElementById("modal-stats").innerHTML = `
