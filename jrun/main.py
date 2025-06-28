@@ -8,10 +8,15 @@ from jrun.jrun_server import serve
 
 
 def get_default_db_path():
-    """Get the default database path using appdirs user data directory."""
-    app_data_dir = appdirs.user_data_dir("jrun")
-    Path(app_data_dir).mkdir(parents=True, exist_ok=True)
-    return str(Path(app_data_dir) / "jrun.db")
+    """Get the default database path using appdirs user cache directory."""
+    cache_dir = appdirs.user_cache_dir("jrun")
+    Path(cache_dir).mkdir(parents=True, exist_ok=True)
+    return str(Path(cache_dir) / "jrun.db")
+
+
+def get_cache_directory():
+    """Get the cache directory path for jrun."""
+    return appdirs.user_cache_dir("jrun")
 
 
 def ask_user_yes_no_question(
@@ -273,7 +278,10 @@ def main():
 
     # Show jrun info
     elif args.cmd == "info":
-        print(f"Using jrun database at {args.db}")
+        cache_dir = get_cache_directory()
+        print(f"📁 Cache directory: {cache_dir}")
+        print(f"🗄️  Database file: {args.db}")
+        print(f"📊 Database exists: {'Yes' if Path(args.db).exists() else 'No'}")
 
     else:
         print("Unknown command")
