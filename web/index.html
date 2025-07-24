@@ -2310,7 +2310,7 @@
           });
         });
 
-        // Group jobs by dependency signature
+        // Group jobs by dependency signature (node_id or parents|children)
         const groupMap = new Map();
         jobs.forEach((job) => {
           const jobId = job.id.toString();
