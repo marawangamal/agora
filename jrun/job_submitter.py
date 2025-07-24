@@ -305,6 +305,9 @@ class JobSubmitter(JobDB):
         elif node.type == "parallel":
             # Parallel group
             parallel_job_ids = []
+            node_id = (
+                f"{random.randint(100000, 999999)}" if node_id is None else node_id
+            )
             for entry in node.jobs:
                 group_name_i = ":".join(
                     [p for p in [copy.deepcopy(node_name), entry.name] if p]

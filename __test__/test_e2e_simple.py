@@ -1021,6 +1021,75 @@ class TestJrunSimple(unittest.TestCase):
         jobs = viewer.get_jobs()
         self.assertEqual([parse_idx(j.command) for j in jobs], [None, None, "0", "1"])
 
+    @patch("os.popen")
+    def test_group_node_id_workflow(self, mock_popen):
+        """Test that jobs are submitted correctly with node IDs."""
+
+        ##### Setup mocks
+        mock_popen.side_effect = self.get_popen_mock_fn()
+        viewer = JobViewer(self.db_path)
+        submitter = JobSubmitter(self.db_path)
+        root = {
+            "group": {
+                "name": "root",
+                "type": "sequential",
+                "jobs": [
+                    {
+                        "group": {
+                            "name": "pgroup",
+                            "type": "parallel",
+                            "jobs": [
+                                {
+                                    "job": {
+                                        "preamble": "base",
+                                        "command": "echo 'First job' --group_id {group_id}",
+                                    },
+                                },
+                                {
+                                    "job": {
+                                        "preamble": "gpu",
+                                        "command": "echo 'Second job' --group_id {group_id}",
+                                    },
+                                },
+                            ],
+                        }
+                    },
+                    {
+                        "group": {
+                            "name": "sweep",
+                            "type": "sweep",
+                            "preamble": "gpu",
+                            "sweep": {
+                                "param1": [1, 2],
+                            },
+                            "sweep_template": "python test.py param1={param1} --group_id {group_id} --sweep_idx {sweep_idx}",
+                        }
+                    },
+                ],
+            }
+        }
+
+        submitter.walk(
+            node=submitter._parse_group_dict(root["group"]),
+            node_name=root["group"]["name"],
+            preamble_map=self.preamble_map,
+            depends_on=[],
+            submitted_jobs=[],
+        )
+
+        parse_idx = lambda cmd: (
+            match := re.search(r"--sweep_idx (\d+)", cmd)
+        ) and match.group(1)
+
+        # Verify submission
+        jobs = viewer.get_jobs()
+        self.assertIsNotNone(jobs[0].node_id, "Node ID should not be None")
+        self.assertEqual(
+            jobs[0].node_id,
+            jobs[1].node_id,
+            "Node IDs should be the same for parallel group",
+        )
+
     # @patch("os.popen")
     # def test_sbatch_args(self, mock_popen):
     #     """Test that sbatch args are passed correctly."""
