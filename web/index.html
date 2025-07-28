@@ -2411,9 +2411,11 @@
         const jobIds = group.jobs.map((j) => j.id);
         const displayText = smartRangeDisplay(jobIds);
         const breakdown = getStatusBreakdown(group.jobs);
+        const nodeId = group.jobs[0].node_id || "N/A";
 
         tooltip.innerHTML = `
             <div class="tooltip-header">Group #${displayText}</div>
+            <div class="tooltip-breakdown">Node ID: ${nodeId}</div>
             <div class="tooltip-breakdown">${breakdown}</div>
             <div class="tooltip-breakdown">Total Duration: ${group.totalDuration}</div>
         `;

@@ -1090,6 +1090,12 @@ class TestJrunSimple(unittest.TestCase):
             "Node IDs should be the same for parallel group",
         )
 
+        self.assertEqual(
+            jobs[2].node_id,
+            jobs[3].node_id,
+            "Node IDs should be the same for parallel group",
+        )
+
     # @patch("os.popen")
     # def test_sbatch_args(self, mock_popen):
     #     """Test that sbatch args are passed correctly."""
