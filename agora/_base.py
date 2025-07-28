@@ -5,7 +5,7 @@ import re
 import sqlite3
 from typing import Any, Callable, Dict, List, Literal, Optional, Tuple, Union
 
-from jrun.interfaces import JobInsert, Job, PGroup, PJob
+from agora.interfaces import JobInsert, Job, PGroup, PJob
 
 
 class JobDB:

@@ -29,7 +29,7 @@ dependencies = [
 ]
 
 [project.scripts]
-jrun = "jrun.main:main"
+agora = "agora.main:main"
 
 [tool.setuptools.packages.find]
-include = ["jrun*"]
+include = ["agora*"]

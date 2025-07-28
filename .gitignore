@@ -1,5 +1,5 @@
 .venv
-jrun.db
+agora.db
 **.pyc
 __pycache__/
 

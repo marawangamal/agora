@@ -4,8 +4,8 @@ from tabulate import tabulate
 from collections import Counter, defaultdict
 from html import escape
 
-from jrun._base import JobDB
-from jrun.interfaces import Job
+from agora._base import JobDB
+from agora.interfaces import Job
 
 SABBRV = {
     "COMPLETED": "✅",

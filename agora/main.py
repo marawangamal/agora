@@ -1,22 +1,22 @@
+import appdirs
 import argparse
 from typing import Callable, Optional
-import appdirs
 from pathlib import Path
-from jrun.job_submitter import JobSubmitter
-from jrun.job_viewer import JobViewer
-from jrun.jrun_server import serve
+from agora.job_submitter import JobSubmitter
+from agora.job_viewer import JobViewer
+from agora.server import serve
 
 
 def get_default_db_path():
     """Get the default database path using appdirs user cache directory."""
-    cache_dir = appdirs.user_cache_dir("jrun")
+    cache_dir = appdirs.user_cache_dir("agora")
     Path(cache_dir).mkdir(parents=True, exist_ok=True)
-    return str(Path(cache_dir) / "jrun.db")
+    return str(Path(cache_dir) / "agora.db")
 
 
 def get_cache_directory():
-    """Get the cache directory path for jrun."""
-    return appdirs.user_cache_dir("jrun")
+    """Get the cache directory path for agora."""
+    return appdirs.user_cache_dir("agora")
 
 
 def ask_user_yes_no_question(
@@ -38,10 +38,10 @@ def ask_user_yes_no_question(
 
 def parse_args():
     default_db = get_default_db_path()
-    parser = argparse.ArgumentParser(prog="jrun", description="Tiny Slurm helper")
+    parser = argparse.ArgumentParser(prog="agora", description="Tiny Slurm helper")
     sub = parser.add_subparsers(dest="cmd", required=True)
 
-    ###### jrun submit --file workflow.yaml (run all jobs in the workflow)
+    ###### agora submit --file workflow.yaml (run all jobs in the workflow)
     p_submit = sub.add_parser("submit", help="Submit jobs from a YAML workflow")
     p_submit.add_argument("--file", required=True, help="Path to workflow.yaml")
     p_submit.add_argument("--db", default=default_db, help="SQLite DB path")
@@ -55,7 +55,7 @@ def parse_args():
         "--deptype", choices=["afterok", "afterany"], default="afterok"
     )
 
-    ###### jrun status (get job status)
+    ###### agora status (get job status)
     p_status = sub.add_parser("status", help="Show job status table")
     p_status.add_argument("--db", default=default_db, help="SQLite DB path")
     p_status.add_argument(
@@ -71,11 +71,11 @@ def parse_args():
         help="Columns to display in the status table (default: id, node_name, node_id, command, status)",
     )
 
-    ###### jrun sbatch (pass args straight to sbatch)
+    ###### agora sbatch (pass args straight to sbatch)
     p_sbatch = sub.add_parser("sbatch", help="Pass args straight to sbatch")
     p_sbatch.add_argument("--db", default=default_db, help="SQLite DB path")
 
-    ###### jrun viz (visualize job dependencies)
+    ###### agora viz (visualize job dependencies)
     p_viz = sub.add_parser("viz", help="Visualize job dependencies")
     p_viz.add_argument("--db", default=default_db, help="SQLite DB path")
     p_viz.add_argument(
@@ -91,7 +91,7 @@ def parse_args():
         help="Visualization mode",
     )
 
-    ###### jrun cancel (stop jobs)
+    ###### agora cancel (stop jobs)
     p_cancel = sub.add_parser("cancel", help="Cancel jobs")
     p_cancel.add_argument(
         "job_ids",
@@ -102,7 +102,7 @@ def parse_args():
         "--db", default=default_db, help=f"SQLite DB path (default: {default_db})"
     )
 
-    ###### jrun delete
+    ###### agora delete
     p_clean = sub.add_parser("delete", help="Clear up the database")
     p_clean.add_argument("--db", default=default_db, help="SQLite DB path")
     p_clean.add_argument(
@@ -118,7 +118,7 @@ def parse_args():
         help="Node IDs to delete (space-separated). If provided, deletes jobs for these nodes only.",
     )
 
-    ###### jrun retry (resubmit jobs)
+    ###### agora retry (resubmit jobs)
     p_retry = sub.add_parser("retry", help="Retry jobs")
     p_retry.add_argument("--db", default=default_db, help="SQLite DB path")
     p_retry.add_argument(
@@ -142,7 +142,7 @@ def parse_args():
         "--debug", action="store_true", help="Don't call sbatch, just print & record"
     )
 
-    ###### jrun serve (start web interface)
+    ###### agora serve (start web interface)
     p_serve = sub.add_parser("serve", help="Start Next.js web interface server")
     p_serve.add_argument(
         "--port", type=int, default=3000, help="Port to serve on (default: 3000)"
@@ -155,16 +155,16 @@ def parse_args():
         "--no-browser", action="store_true", help="Don't open browser automatically"
     )
 
-    ###### jrun info
-    p_info = sub.add_parser("info", help="Show jrun info")
+    ###### agora info
+    p_info = sub.add_parser("info", help="Show agora info")
     p_info.add_argument(
-        "--db", default=default_db, help="SQLite DB path (default: jrun.db)"
+        "--db", default=default_db, help="SQLite DB path (default: agora.db)"
     )
 
-    ###### jrun data
-    p_data = sub.add_parser("data", help="Show jrun data")
+    ###### agora data
+    p_data = sub.add_parser("data", help="Show agora data")
     p_data.add_argument(
-        "--db", default=default_db, help="SQLite DB path (default: jrun.db)"
+        "--db", default=default_db, help="SQLite DB path (default: agora.db)"
     )
 
     # ---------- Passthrough for sbatch ----------
@@ -180,12 +180,12 @@ def get_build_directory():
     """Auto-detect the Next.js build directory"""
     # Look for jweb directory relative to main.py
     current_file = Path(__file__)
-    project_root = current_file.parent.parent  # Go up from jrun/jrun/ to jrun/
+    project_root = current_file.parent.parent  # Go up from agora/agora/ to agora/
 
     # Try different possible locations
     possible_paths = [
-        project_root / "jweb" / "out",  # jrun/jweb/out
-        project_root / "jweb" / "build",  # jrun/jweb/build
+        project_root / "jweb" / "out",  # agora/jweb/out
+        project_root / "jweb" / "build",  # agora/jweb/build
         Path("jweb/out"),  # Current directory
         Path("jweb/build"),  # Current directory
         Path("out"),  # Current directory
@@ -272,11 +272,11 @@ def main():
             print(f"❌ Failed to start server: {e}")
             exit(1)
 
-    # Show jrun data
+    # Show agora data
     elif args.cmd == "data":
         jr = JobViewer(args.db)
 
-    # Show jrun info
+    # Show agora info
     elif args.cmd == "info":
         cache_dir = get_cache_directory()
         print(f"📁 Cache directory: {cache_dir}")
