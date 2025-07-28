@@ -2765,8 +2765,11 @@
           filters.dependencies.size > 0;
         const filterIndicator = isFiltered ? " (filtered)" : "";
 
+        const nodeId = group.jobs[0].node_id || "N/A";
         document.getElementById("modal-subtitle").innerHTML = `
           <span>${group.groupName}${filterIndicator}</span>
+          <span>•</span>
+          <span>Node ID: ${nodeId}</span>
           <span>•</span>
           <span>${group.jobs.length} jobs</span>
           <span>•</span>
