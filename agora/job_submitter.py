@@ -9,8 +9,8 @@ import time
 from typing import Callable, Dict, List, Optional, Union
 
 import yaml
-from jrun._base import JobDB
-from jrun.interfaces import Job, JobInsert, Job, PGroup, PJob
+from agora._base import JobDB
+from agora.interfaces import Job, JobInsert, Job, PGroup, PJob
 
 JOB_RE = re.compile(r"Submitted batch job (\d+)")
 INACTIVE_PARENT_RULES = [

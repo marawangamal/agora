@@ -1,10 +1,10 @@
-# jrun/serve.py
+# agora/serve.py
 
 import os
 from waitress import serve as waitress_serve
 from flask import Flask, jsonify, send_from_directory, request
 from pathlib import Path
-from jrun.job_viewer import JobViewer
+from agora.job_viewer import JobViewer
 
 
 def create_app(default_db: str, web_folder: Path) -> Flask:
@@ -67,7 +67,7 @@ def serve(db: str, host: str = "localhost", port: int = 3000, web_folder: str = 
     app = create_app(default_db=db, web_folder=web_path)
     # print(f"🔌 Serving on http://{host}:{port}  (DB: {db})")
 
-    print("🚀 jrun web server")
+    print("🚀 agora web server")
     print(f"   Running on http://{host}:{port}")
     print(f"   Database: {Path(db).name}")
     print("")

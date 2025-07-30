@@ -1,7 +1,7 @@
 <!-- ─────────────────────────────  HERO  ───────────────────────────── -->
 <div align="center">
 
-  <h1>🌳 JRun</h1>
+  <h1>🌳 AGORA</h1>
   <p><em>Submit &amp; track job-trees on SLURM with one command.</em></p>
 
   <p>
@@ -64,13 +64,13 @@ pip install -e . # editable install
 
 ```bash
 # Submit a workflow from YAML file
-jrun submit --file workflow.yaml
+agora submit --file workflow.yaml
 
 # Check job statuses
-jrun status
+agora status
 
 # Submit a single job
-jrun sbatch --cpus-per-task=4 --mem=16G --wrap="python train.py"
+agora sbatch --cpus-per-task=4 --mem=16G --wrap="python train.py"
 ```
 
 ## Quick start
@@ -110,8 +110,8 @@ preambles:
 
 #### Submit tree and visuzlize
 ```bash
-$ jrun submit --file path/to/job/tree.yaml
-$ jrun viz # add `--mode mermaid` for mermaid diagram
+$ agora submit --file path/to/job/tree.yaml
+$ agora viz # add `--mode mermaid` for mermaid diagram
 Job Dependencies:
 ========================================
 6866829 []: (COMPLETED): echo 'python train.py'
@@ -170,15 +170,15 @@ group:
         command: "python eval.py --group_id {group_id}" # (e.g., aaa-bbb)
 ```
 
-# 🌳 JRun Features & Status
+# 🌳 AGORA Features & Status
 
 ## Current Features
-- [x] Submit job trees from YAML files (`jrun submit --file workflow.yaml`)
-- [x] Monitor job status with visualization (`jrun status`, `jrun viz`)
+- [x] Submit job trees from YAML files (`agora submit --file workflow.yaml`)
+- [x] Monitor job status with visualization (`agora status`, `agora viz`)
 - [x] Parameter sweeps and parallel job execution
 - [x] Job graph vizualization
-- [x] CLI filtering (`jrun status --filter status=COMPLETED`)
-- [x] Job retry (`jrun retry JOB_ID`)
+- [x] CLI filtering (`agora status --filter status=COMPLETED`)
+- [x] Job retry (`agora retry JOB_ID`)
 - [x] Job delete subgraph
 - [x] Web app
 - [x] Improve visual for loop group

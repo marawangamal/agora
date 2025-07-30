@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Simple test for jrun package.
-This script tests the basic functionality of jrun by submitting a simple job.
+Simple test for agora package.
+This script tests the basic functionality of agora by submitting a simple job.
 """
 
 import os
@@ -11,13 +11,13 @@ from typing import Optional
 import unittest
 from unittest.mock import patch, MagicMock
 
-from jrun.interfaces import Job
-from jrun.job_submitter import JobSubmitter
-from jrun.job_viewer import JobViewer
+from agora.interfaces import Job
+from agora.job_submitter import JobSubmitter
+from agora.job_viewer import JobViewer
 
 
 class TestJrunSimple(unittest.TestCase):
-    """Simple test for jrun package."""
+    """Simple test for agora package."""
 
     # ------------------------------------------------------------------ #
     # set-up / tear-down                                                 #
