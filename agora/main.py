@@ -1,3 +1,4 @@
+import os
 import appdirs
 import argparse
 from typing import Callable, Optional
@@ -266,7 +267,7 @@ def main():
                 db=args.db,
                 host=args.host,
                 port=args.port,
-                web_folder="web",
+                web_folder=os.path.join(os.path.dirname(__file__), "web"),
             )
         except Exception as e:
             print(f"❌ Failed to start server: {e}")
