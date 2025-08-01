@@ -32,7 +32,4 @@ dependencies = [
 agora = "agora.main:main"
 
 [tool.setuptools.packages.find]
-include = ["agora*"]
-
-[tool.setuptools.package_data]
-agora = ["web/**/*"]
+include = ["agora*", "web*"]
