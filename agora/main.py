@@ -179,16 +179,16 @@ def parse_args():
 
 def get_build_directory():
     """Auto-detect the Next.js build directory"""
-    # Look for jweb directory relative to main.py
+    # Look for agora directory relative to main.py
     current_file = Path(__file__)
     project_root = current_file.parent.parent  # Go up from agora/agora/ to agora/
 
     # Try different possible locations
     possible_paths = [
-        project_root / "jweb" / "out",  # agora/jweb/out
-        project_root / "jweb" / "build",  # agora/jweb/build
-        Path("jweb/out"),  # Current directory
-        Path("jweb/build"),  # Current directory
+        project_root / "agora" / "out",  # agora/agora/out
+        project_root / "agora" / "build",  # agora/agora/build
+        Path("agora/out"),  # Current directory
+        Path("agora/build"),  # Current directory
         Path("out"),  # Current directory
         Path("build"),  # Current directory
     ]
@@ -198,7 +198,7 @@ def get_build_directory():
             return str(path.absolute())
 
     # Default fallback
-    return str(project_root / "jweb" / "out")
+    return str(project_root / "agora" / "out")
 
 
 def main():
