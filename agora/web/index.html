@@ -4,31 +4,37 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>SLURM Dependency Graph</title>
+    <!-- Add Inter font from Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
     <style>
       :root {
-        /* Light theme colors */
-        --bg-primary: #f9fafb;
-        --bg-secondary: #ffffff;
+        /* Modern color theme inspired by the provided design */
+        --text: #1a1a1a;
+        --text-light: #666;
+        --text-tertiary: #999;
+        --accent: #0066cc;
+        --border: #eee;
+        --bg: #fff;
+        --bg-secondary: #f8f9fa;
         --bg-tertiary: #fafafa;
         --bg-quaternary: #f3f4f6;
-        --text-primary: #111827;
-        --text-secondary: #6b7280;
-        --text-tertiary: #9ca3af;
-        --border-primary: #e5e7eb;
-        --border-secondary: #d1d5db;
-        --shadow-primary: rgba(0, 0, 0, 0.1);
-        --shadow-secondary: rgba(0, 0, 0, 0.05);
-        --overlay: rgba(0, 0, 0, 0.5);
+        --shadow: rgba(0, 0, 0, 0.1);
+        --shadow-light: rgba(0, 0, 0, 0.05);
 
-        /* Status colors (same for both themes) */
-        --status-running: #3b82f6;
+        /* Status colors */
+        --status-running: #0066cc;
         --status-completed: #10b981;
         --status-failed: #ef4444;
         --status-pending: #f59e0b;
         --status-mixed: #d97706;
 
         /* Status backgrounds */
-        --status-running-bg: #dbeafe;
+        --status-running-bg: #eff6ff;
         --status-completed-bg: #d1fae5;
         --status-failed-bg: #fee2e2;
         --status-pending-bg: #f3f4f6;
@@ -53,7 +59,7 @@
         /* Filter colors */
         --filter-bg: #f8fafc;
         --filter-border: #e2e8f0;
-        --filter-active: #3b82f6;
+        --filter-active: #0066cc;
         --filter-active-bg: #eff6ff;
 
         /* Log viewer colors */
@@ -66,18 +72,17 @@
 
       [data-theme="dark"] {
         /* Dark theme colors */
-        --bg-primary: #111827;
-        --bg-secondary: #1f2937;
-        --bg-tertiary: #374151;
-        --bg-quaternary: #4b5563;
-        --text-primary: #f9fafb;
-        --text-secondary: #d1d5db;
-        --text-tertiary: #9ca3af;
-        --border-primary: #374151;
-        --border-secondary: #4b5563;
-        --shadow-primary: rgba(0, 0, 0, 0.3);
-        --shadow-secondary: rgba(0, 0, 0, 0.2);
-        --overlay: rgba(0, 0, 0, 0.7);
+        --text: #e6e6e6;
+        --text-light: #999;
+        --text-tertiary: #666;
+        --accent: #4d9fff;
+        --border: #333;
+        --bg: #111;
+        --bg-secondary: #1a1a1a;
+        --bg-tertiary: #222;
+        --bg-quaternary: #2a2a2a;
+        --shadow: rgba(0, 0, 0, 0.3);
+        --shadow-light: rgba(0, 0, 0, 0.2);
 
         /* Status backgrounds (darker) */
         --status-running-bg: #1e3a8a;
@@ -103,8 +108,8 @@
         --error-text: #fca5a5;
 
         /* Filter colors (darker) */
-        --filter-bg: #1f2937;
-        --filter-border: #374151;
+        --filter-bg: #1a1a1a;
+        --filter-border: #333;
         --filter-active: #60a5fa;
         --filter-active-bg: #1e3a8a;
 
@@ -123,40 +128,47 @@
       }
 
       body {
-        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
-          sans-serif;
-        background-color: var(--bg-primary);
-        color: var(--text-primary);
-        padding: 20px;
+        font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI",
+          Roboto, sans-serif;
+        background-color: var(--bg);
+        color: var(--text);
+        line-height: 1.6;
+        font-size: 16px;
         transition: background-color 0.3s ease, color 0.3s ease;
+        min-height: 100vh;
       }
 
       .container {
         max-width: 1400px;
         margin: 0 auto;
+        padding: 2rem 1.5rem;
       }
 
       .header {
-        margin-bottom: 20px;
+        margin-bottom: 2rem;
         display: flex;
         justify-content: space-between;
         align-items: flex-start;
+        padding-bottom: 1.5rem;
+        border-bottom: 1px solid var(--border);
       }
 
       .header-content h1 {
         font-size: 28px;
-        font-weight: bold;
-        margin-bottom: 4px;
-        color: var(--text-primary);
+        font-weight: 600;
+        margin-bottom: 8px;
+        color: var(--text);
         display: flex;
         align-items: center;
         gap: 12px;
+        letter-spacing: -0.02em;
       }
 
       .header-content .subtitle {
-        color: var(--text-secondary);
-        font-size: 14px;
+        color: var(--text-light);
+        font-size: 16px;
         margin-bottom: 8px;
+        line-height: 1.5;
       }
 
       .copyright {
@@ -165,11 +177,13 @@
         display: flex;
         align-items: center;
         gap: 8px;
+        line-height: 1.4;
       }
 
       .copyright a {
-        color: var(--status-running);
+        color: var(--accent);
         text-decoration: none;
+        transition: color 0.2s ease;
       }
 
       .copyright a:hover {
@@ -184,51 +198,57 @@
 
       .theme-toggle {
         background: var(--bg-secondary);
-        border: 1px solid var(--border-primary);
+        border: 1px solid var(--border);
         border-radius: 8px;
-        padding: 8px 12px;
+        padding: 8px 16px;
         cursor: pointer;
         font-size: 14px;
-        color: var(--text-primary);
+        font-weight: 500;
+        color: var(--text);
         transition: all 0.2s ease;
         display: flex;
         align-items: center;
         gap: 8px;
+        box-shadow: 0 1px 3px var(--shadow-light);
       }
 
       .theme-toggle:hover {
-        background: var(--bg-quaternary);
-        border-color: var(--border-secondary);
+        background: var(--bg-tertiary);
+        border-color: var(--accent);
+        transform: translateY(-1px);
+        box-shadow: 0 2px 6px var(--shadow);
       }
 
       .main-content {
         display: grid;
-        grid-template-columns: 300px 1fr;
-        gap: 20px;
+        grid-template-columns: 320px 1fr;
+        gap: 2rem;
         height: 600px;
       }
 
       .filters-panel {
         background: var(--bg-secondary);
-        border: 1px solid var(--border-primary);
-        border-radius: 8px;
-        padding: 20px;
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 1.5rem;
         overflow-y: auto;
         transition: all 0.3s ease;
+        box-shadow: 0 2px 8px var(--shadow-light);
       }
 
       .filters-title {
         font-size: 18px;
         font-weight: 600;
-        margin-bottom: 16px;
-        color: var(--text-primary);
+        margin-bottom: 1.5rem;
+        color: var(--text);
         display: flex;
         align-items: center;
         gap: 8px;
+        letter-spacing: -0.01em;
       }
 
       .filter-section {
-        margin-bottom: 20px;
+        margin-bottom: 1.5rem;
       }
 
       .filter-section:last-child {
@@ -238,26 +258,33 @@
       .filter-label {
         font-size: 14px;
         font-weight: 500;
-        color: var(--text-primary);
+        color: var(--text);
         margin-bottom: 8px;
         display: block;
+        letter-spacing: -0.005em;
       }
 
       .search-input {
         width: 100%;
-        padding: 8px 12px;
-        border: 1px solid var(--border-primary);
-        border-radius: 6px;
-        background: var(--bg-primary);
-        color: var(--text-primary);
+        padding: 12px 16px;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        background: var(--bg);
+        color: var(--text);
         font-size: 14px;
+        font-family: inherit;
         transition: all 0.2s ease;
+        box-shadow: 0 1px 2px var(--shadow-light);
       }
 
       .search-input:focus {
         outline: none;
-        border-color: var(--filter-active);
+        border-color: var(--accent);
         box-shadow: 0 0 0 3px var(--filter-active-bg);
+      }
+
+      .search-input::placeholder {
+        color: var(--text-tertiary);
       }
 
       .filter-chips {
@@ -267,42 +294,51 @@
       }
 
       .filter-chip {
-        padding: 6px 12px;
-        border: 1px solid var(--border-primary);
-        border-radius: 16px;
-        background: var(--bg-primary);
-        color: var(--text-secondary);
+        padding: 8px 12px;
+        border: 1px solid var(--border);
+        border-radius: 20px;
+        background: var(--bg);
+        color: var(--text-light);
         font-size: 12px;
+        font-weight: 500;
         cursor: pointer;
         transition: all 0.2s ease;
         user-select: none;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        box-shadow: 0 1px 2px var(--shadow-light);
       }
 
       .filter-chip:hover {
-        border-color: var(--filter-active);
-        color: var(--filter-active);
+        border-color: var(--accent);
+        color: var(--accent);
+        background: var(--filter-active-bg);
+        transform: translateY(-1px);
       }
 
       .filter-chip.active {
-        background: var(--filter-active);
-        border-color: var(--filter-active);
+        background: var(--accent);
+        border-color: var(--accent);
         color: white;
+        box-shadow: 0 2px 4px var(--shadow);
       }
 
       .filter-stats {
-        margin-top: 16px;
-        padding: 12px;
+        margin-top: 1.5rem;
+        padding: 16px;
         background: var(--filter-bg);
         border: 1px solid var(--filter-border);
-        border-radius: 6px;
+        border-radius: 8px;
         font-size: 12px;
-        color: var(--text-secondary);
+        color: var(--text-light);
       }
 
       .filter-stats-item {
         display: flex;
         justify-content: space-between;
-        margin-bottom: 4px;
+        margin-bottom: 6px;
+        font-weight: 500;
       }
 
       .filter-stats-item:last-child {
@@ -311,19 +347,25 @@
 
       .clear-filters {
         width: 100%;
-        padding: 8px 12px;
+        padding: 10px 16px;
         background: var(--bg-quaternary);
-        border: 1px solid var(--border-primary);
-        border-radius: 6px;
-        color: var(--text-primary);
-        font-size: 12px;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        color: var(--text);
+        font-size: 14px;
+        font-weight: 500;
         cursor: pointer;
         transition: all 0.2s ease;
-        margin-top: 12px;
+        margin-top: 1rem;
+        font-family: inherit;
       }
 
-      .clear-filters:hover {
-        background: var(--border-primary);
+      .clear-filters:hover:not(:disabled) {
+        background: var(--accent);
+        color: white;
+        border-color: var(--accent);
+        transform: translateY(-1px);
+        box-shadow: 0 2px 4px var(--shadow);
       }
 
       .clear-filters:disabled {
@@ -336,10 +378,11 @@
         width: 100%;
         height: 100%;
         background: var(--bg-secondary);
-        border: 1px solid var(--border-primary);
-        border-radius: 8px;
+        border: 1px solid var(--border);
+        border-radius: 12px;
         overflow: hidden;
-        transition: background-color 0.3s ease, border-color 0.3s ease;
+        transition: all 0.3s ease;
+        box-shadow: 0 2px 8px var(--shadow-light);
       }
 
       .graph-controls {
@@ -351,27 +394,32 @@
         flex-direction: column;
         gap: 8px;
         background: var(--bg-secondary);
-        border: 1px solid var(--border-primary);
+        border: 1px solid var(--border);
         border-radius: 8px;
         padding: 8px;
-        box-shadow: 0 4px 6px var(--shadow-primary);
+        box-shadow: 0 4px 12px var(--shadow);
         transition: all 0.3s ease;
       }
 
       .graph-controls button {
-        padding: 4px 8px;
+        padding: 8px 12px;
         border: none;
-        border-radius: 4px;
-        background: var(--bg-quaternary);
+        border-radius: 6px;
+        background: var(--bg);
         cursor: pointer;
         font-size: 14px;
+        font-weight: 500;
         min-width: 40px;
-        color: var(--text-primary);
+        color: var(--text);
         transition: all 0.2s ease;
+        font-family: inherit;
+        box-shadow: 0 1px 2px var(--shadow-light);
       }
 
       .graph-controls button:hover {
-        background: var(--border-primary);
+        background: var(--bg-tertiary);
+        transform: translateY(-1px);
+        box-shadow: 0 2px 4px var(--shadow);
       }
 
       .reset-btn {
@@ -380,10 +428,19 @@
         font-size: 12px !important;
       }
 
+      .reset-btn:hover {
+        background: var(--status-running) !important;
+        color: white !important;
+      }
+
       .refresh-btn {
         background: var(--status-completed) !important;
         color: white !important;
         font-size: 12px !important;
+      }
+
+      .refresh-btn:hover {
+        background: #059669 !important;
       }
 
       .graph-info {
@@ -391,12 +448,13 @@
         bottom: 16px;
         left: 16px;
         background: var(--bg-secondary);
-        border: 1px solid var(--border-primary);
-        border-radius: 6px;
-        padding: 8px 12px;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 8px 16px;
         font-size: 12px;
-        color: var(--text-secondary);
-        box-shadow: 0 2px 4px var(--shadow-secondary);
+        font-weight: 500;
+        color: var(--text-light);
+        box-shadow: 0 2px 8px var(--shadow);
       }
 
       .loading-indicator {
@@ -405,13 +463,15 @@
         left: 50%;
         transform: translate(-50%, -50%);
         background: var(--bg-secondary);
-        padding: 20px;
-        border-radius: 8px;
-        box-shadow: 0 4px 6px var(--shadow-primary);
+        padding: 24px 32px;
+        border-radius: 12px;
+        box-shadow: 0 8px 25px var(--shadow);
         display: none;
         z-index: 20;
-        color: var(--text-primary);
+        color: var(--text);
+        font-weight: 500;
         transition: all 0.3s ease;
+        border: 1px solid var(--border);
       }
 
       .loading-indicator.show {
@@ -424,13 +484,15 @@
         left: 16px;
         background: var(--error-bg);
         color: var(--error-text);
-        padding: 8px 12px;
-        border-radius: 6px;
-        font-size: 12px;
+        padding: 12px 16px;
+        border-radius: 8px;
+        font-size: 13px;
+        font-weight: 500;
         display: none;
         z-index: 20;
         border: 1px solid var(--error-border);
         transition: all 0.3s ease;
+        box-shadow: 0 4px 12px var(--shadow);
       }
 
       .error-indicator.show {
@@ -456,52 +518,57 @@
         display: block;
       }
 
-      /* Simplified Tooltip Styles */
+      /* Modern Tooltip Styles */
       .tooltip {
         position: absolute;
         background: var(--bg-secondary);
-        border: 1px solid var(--border-primary);
-        border-radius: 6px;
-        padding: 8px 12px;
-        box-shadow: 0 4px 6px var(--shadow-primary);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 12px 16px;
+        box-shadow: 0 8px 25px var(--shadow);
         font-size: 12px;
-        max-width: 200px;
+        max-width: 220px;
         z-index: 1000;
         pointer-events: none;
         opacity: 0;
-        transition: opacity 0.2s ease;
+        transition: all 0.2s ease;
+        backdrop-filter: blur(8px);
       }
 
       .tooltip.show {
         opacity: 1;
+        transform: translateY(-2px);
       }
 
       .tooltip-header {
         font-weight: 600;
         margin-bottom: 6px;
-        color: var(--text-primary);
+        color: var(--text);
         font-size: 13px;
+        letter-spacing: -0.005em;
       }
 
       .tooltip-breakdown {
         font-size: 11px;
-        color: var(--text-secondary);
-        line-height: 1.4;
+        color: var(--text-light);
+        line-height: 1.5;
+        font-weight: 500;
       }
 
-      /* Modal Styles */
+      /* Modern Modal Styles */
       .modal {
         position: fixed;
         top: 0;
         left: 0;
         width: 100%;
         height: 100%;
-        background: var(--overlay);
+        background: rgba(0, 0, 0, 0.5);
+        backdrop-filter: blur(8px);
         display: none;
         align-items: center;
         justify-content: center;
         z-index: 1000;
-        transition: background-color 0.3s ease;
+        transition: all 0.3s ease;
       }
 
       .modal.show {
@@ -510,14 +577,15 @@
 
       .modal-content {
         background: var(--bg-secondary);
-        border-radius: 12px;
-        box-shadow: 0 20px 25px var(--shadow-primary);
-        max-width: 800px;
-        max-height: 80vh;
+        border-radius: 16px;
+        box-shadow: 0 25px 50px var(--shadow);
+        max-width: 900px;
+        max-height: 85vh;
         width: 90%;
         overflow: hidden;
-        animation: modalSlideIn 0.2s ease-out;
-        transition: background-color 0.3s ease;
+        animation: modalSlideIn 0.3s ease-out;
+        transition: all 0.3s ease;
+        border: 1px solid var(--border);
       }
 
       @keyframes modalSlideIn {
@@ -532,27 +600,29 @@
       }
 
       .modal-header {
-        padding: 24px 24px 16px 24px;
-        border-bottom: 1px solid var(--border-primary);
+        padding: 32px 32px 20px 32px;
+        border-bottom: 1px solid var(--border);
         display: flex;
         align-items: flex-start;
         justify-content: space-between;
-        transition: border-color 0.3s ease;
+        transition: all 0.3s ease;
       }
 
       .modal-title {
-        font-size: 20px;
+        font-size: 24px;
         font-weight: 600;
-        color: var(--text-primary);
-        margin-bottom: 4px;
+        color: var(--text);
+        margin-bottom: 8px;
+        letter-spacing: -0.02em;
       }
 
       .modal-subtitle {
-        font-size: 14px;
-        color: var(--text-secondary);
+        font-size: 15px;
+        color: var(--text-light);
         display: flex;
         align-items: center;
         gap: 16px;
+        font-weight: 500;
       }
 
       .modal-stats {
@@ -564,37 +634,45 @@
       .stat-item {
         display: flex;
         align-items: center;
-        gap: 4px;
-        font-size: 12px;
-        color: var(--text-secondary);
+        gap: 6px;
+        font-size: 13px;
+        color: var(--text-light);
+        font-weight: 500;
       }
 
       .stat-value {
         font-weight: 600;
-        color: var(--text-primary);
+        color: var(--text);
+        font-size: 14px;
       }
 
       .close-btn {
         background: none;
         border: none;
-        font-size: 24px;
+        font-size: 28px;
         cursor: pointer;
         color: var(--text-tertiary);
-        padding: 4px;
-        border-radius: 4px;
+        padding: 8px;
+        border-radius: 8px;
         line-height: 1;
         transition: all 0.2s ease;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 40px;
+        height: 40px;
       }
 
       .close-btn:hover {
-        color: var(--text-secondary);
-        background: var(--bg-quaternary);
+        color: var(--text);
+        background: var(--bg-tertiary);
+        transform: scale(1.05);
       }
 
       .modal-body {
-        padding: 16px 24px 24px 24px;
+        padding: 20px 32px 32px 32px;
         overflow-y: auto;
-        max-height: 60vh;
+        max-height: 65vh;
       }
 
       .job-grid {
@@ -603,18 +681,19 @@
       }
 
       .job-card {
-        border: 1px solid var(--border-primary);
-        border-radius: 8px;
-        padding: 16px;
-        transition: all 0.2s;
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 20px;
+        transition: all 0.2s ease;
         background: var(--bg-tertiary);
+        box-shadow: 0 2px 4px var(--shadow-light);
       }
 
       .job-card:hover {
-        background: var(--bg-quaternary);
-        border-color: var(--border-secondary);
-        transform: translateY(-1px);
-        box-shadow: 0 4px 6px var(--shadow-secondary);
+        background: var(--bg);
+        border-color: var(--accent);
+        transform: translateY(-2px);
+        box-shadow: 0 8px 25px var(--shadow);
       }
 
       .job-header {
@@ -625,10 +704,11 @@
       }
 
       .job-id {
-        font-family: monospace;
+        font-family: "Inter", monospace;
         font-weight: 600;
-        font-size: 16px;
-        color: var(--text-primary);
+        font-size: 18px;
+        color: var(--text);
+        letter-spacing: -0.01em;
       }
 
       .job-status {
@@ -642,17 +722,19 @@
       }
 
       .job-command {
-        font-family: monospace;
+        font-family: "SF Mono", "Monaco", "Inconsolata", "Roboto Mono",
+          monospace;
         background: var(--bg-quaternary);
-        padding: 8px 12px;
-        border-radius: 6px;
-        font-size: 13px;
-        color: var(--text-primary);
-        margin-bottom: 12px;
-        border-left: 3px solid var(--border-secondary);
+        padding: 12px 16px;
+        border-radius: 8px;
+        font-size: 14px;
+        color: var(--text);
+        margin-bottom: 16px;
+        border-left: 4px solid var(--accent);
         word-break: break-all;
         transition: all 0.3s ease;
-        line-height: 1.4;
+        line-height: 1.5;
+        font-weight: 500;
       }
 
       .job-details {
@@ -669,15 +751,18 @@
       }
 
       .job-detail-label {
-        color: var(--text-secondary);
-        font-weight: 500;
+        color: var(--text-light);
+        font-weight: 600;
         font-size: 11px;
         text-transform: uppercase;
-        letter-spacing: 0.5px;
+        letter-spacing: 0.8px;
+        margin-bottom: 4px;
       }
 
       .job-detail-value {
-        color: var(--text-primary);
+        color: var(--text);
+        font-weight: 500;
+        font-size: 14px;
       }
 
       .dependency-list {
@@ -975,23 +1060,34 @@
         }
       }
 
-      /* Responsive design */
+      /* Modern Responsive design */
       @media (max-width: 1200px) {
         .main-content {
-          grid-template-columns: 250px 1fr;
+          grid-template-columns: 280px 1fr;
+          gap: 1.5rem;
+        }
+
+        .container {
+          padding: 1.5rem 1rem;
         }
       }
 
       @media (max-width: 768px) {
+        .container {
+          padding: 1rem 0.75rem;
+        }
+
         .main-content {
           grid-template-columns: 1fr;
           grid-template-rows: auto 1fr;
           height: auto;
+          gap: 1.5rem;
         }
 
         .filters-panel {
           height: auto;
-          max-height: 300px;
+          max-height: 350px;
+          padding: 1rem;
         }
 
         .graph-container {
@@ -1000,17 +1096,90 @@
 
         .header {
           flex-direction: column;
-          gap: 12px;
+          gap: 1rem;
           align-items: flex-start;
+          padding-bottom: 1rem;
+        }
+
+        .header-content h1 {
+          font-size: 24px;
+        }
+
+        .header-content .subtitle {
+          font-size: 15px;
         }
 
         .header-controls {
           align-self: flex-end;
         }
 
+        .modal-content {
+          width: 95vw;
+          max-height: 90vh;
+          border-radius: 12px;
+        }
+
+        .modal-header {
+          padding: 20px 20px 16px 20px;
+        }
+
+        .modal-title {
+          font-size: 20px;
+        }
+
+        .modal-body {
+          padding: 16px 20px 20px 20px;
+        }
+
         .log-modal-content {
           width: 95vw;
           height: 85vh;
+          border-radius: 12px;
+        }
+
+        .job-card {
+          padding: 16px;
+        }
+
+        .filter-chips {
+          gap: 6px;
+        }
+
+        .filter-chip {
+          font-size: 11px;
+          padding: 6px 10px;
+        }
+      }
+
+      @media (max-width: 480px) {
+        .container {
+          padding: 0.75rem 0.5rem;
+        }
+
+        .header-content h1 {
+          font-size: 22px;
+          gap: 8px;
+        }
+
+        .theme-toggle {
+          padding: 6px 12px;
+          font-size: 13px;
+        }
+
+        .graph-container {
+          height: 400px;
+        }
+
+        .modal-content {
+          width: 100vw;
+          height: 100vh;
+          border-radius: 0;
+        }
+
+        .log-modal-content {
+          width: 100vw;
+          height: 100vh;
+          border-radius: 0;
         }
       }
 
@@ -1359,11 +1528,11 @@
         const style = getComputedStyle(root);
 
         return {
-          bgPrimary: style.getPropertyValue("--bg-primary").trim(),
+          bg: style.getPropertyValue("--bg").trim(),
           bgSecondary: style.getPropertyValue("--bg-secondary").trim(),
-          textPrimary: style.getPropertyValue("--text-primary").trim(),
-          textSecondary: style.getPropertyValue("--text-secondary").trim(),
-          borderPrimary: style.getPropertyValue("--border-primary").trim(),
+          text: style.getPropertyValue("--text").trim(),
+          textLight: style.getPropertyValue("--text-light").trim(),
+          border: style.getPropertyValue("--border").trim(),
           statusRunning: style.getPropertyValue("--status-running").trim(),
           statusCompleted: style.getPropertyValue("--status-completed").trim(),
           statusFailed: style.getPropertyValue("--status-failed").trim(),
@@ -2448,10 +2617,10 @@
             // Show empty state
             const cyContainer = document.getElementById("cy");
             cyContainer.innerHTML = `
-                    <div style="display: flex; align-items: center; justify-content: center; height: 100%; flex-direction: column; color: var(--text-secondary);">
+                    <div style="display: flex; align-items: center; justify-content: center; height: 100%; flex-direction: column; color: var(--text-light);">
                         <div style="font-size: 48px; margin-bottom: 16px;">🔍</div>
-                        <div style="font-size: 18px; margin-bottom: 8px;">No jobs match your filters</div>
-                        <div style="font-size: 14px;">Try adjusting your search or filter criteria</div>
+                        <div style="font-size: 18px; margin-bottom: 8px; font-weight: 600;">No jobs match your filters</div>
+                        <div style="font-size: 14px; color: var(--text-tertiary);">Try adjusting your search or filter criteria</div>
                     </div>
                 `;
           }
@@ -2538,7 +2707,7 @@
                   "text-halign": "center",
                   "font-size": "12px",
                   "font-weight": "bold",
-                  color: themeColors.textPrimary,
+                  color: themeColors.text,
                   "text-wrap": "wrap",
                   "text-max-width": "140px",
                   width: "160px",
@@ -2559,8 +2728,8 @@
                 selector: "edge",
                 style: {
                   width: 2,
-                  "line-color": themeColors.textSecondary,
-                  "target-arrow-color": themeColors.textSecondary,
+                  "line-color": themeColors.textLight,
+                  "target-arrow-color": themeColors.textLight,
                   "target-arrow-shape": "triangle",
                   "curve-style": "bezier",
                   "control-point-step-size": 40,
@@ -2571,8 +2740,8 @@
                 selector: "edge:hover",
                 style: {
                   width: 3,
-                  "line-color": themeColors.textPrimary,
-                  "target-arrow-color": themeColors.textPrimary,
+                  "line-color": themeColors.text,
+                  "target-arrow-color": themeColors.text,
                 },
               },
             ],
@@ -2658,19 +2827,19 @@
 
         if (filteredGroups.length === 0) {
           cyContainer.innerHTML = `
-                <div style="display: flex; align-items: center; justify-content: center; height: 100%; flex-direction: column; color: var(--text-secondary);">
+                <div style="display: flex; align-items: center; justify-content: center; height: 100%; flex-direction: column; color: var(--text-light);">
                     <div style="font-size: 48px; margin-bottom: 16px;">🔍</div>
-                    <div style="font-size: 18px; margin-bottom: 8px;">No jobs match your filters</div>
-                    <div style="font-size: 14px;">Try adjusting your search or filter criteria</div>
+                    <div style="font-size: 18px; margin-bottom: 8px; font-weight: 600;">No jobs match your filters</div>
+                    <div style="font-size: 14px; color: var(--text-tertiary);">Try adjusting your search or filter criteria</div>
                 </div>
             `;
           return;
         }
 
         cyContainer.innerHTML = `
-            <div style="display: flex; align-items: center; justify-content: center; height: 100%; flex-direction: column; color: var(--text-secondary);">
-                <div style="font-size: 18px; margin-bottom: 8px;">📊 Simple Graph View</div>
-                <div style="font-size: 14px; margin-bottom: 16px;">External libraries couldn't load, showing basic view</div>
+            <div style="display: flex; align-items: center; justify-content: center; height: 100%; flex-direction: column; color: var(--text-light);">
+                <div style="font-size: 18px; margin-bottom: 8px; font-weight: 600;">📊 Simple Graph View</div>
+                <div style="font-size: 14px; margin-bottom: 16px; color: var(--text-tertiary);">External libraries couldn't load, showing basic view</div>
                 <div style="display: grid; gap: 12px; max-width: 600px; max-height: 400px; overflow-y: auto;">
                     ${filteredGroups
                       .map((group) => {
@@ -2679,17 +2848,17 @@
                         const groupName = group.jobs[0].node_name;
                         const progress = group.progress;
                         return `
-                            <div style="border: 1px solid var(--border-primary); border-radius: 8px; padding: 12px; background: var(--bg-secondary); cursor: pointer;" onclick="showGroupDetails({jobs: ${JSON.stringify(
+                            <div style="border: 1px solid var(--border); border-radius: 12px; padding: 16px; background: var(--bg-secondary); cursor: pointer; transition: all 0.2s ease; box-shadow: 0 2px 4px var(--shadow-light);" onclick="showGroupDetails({jobs: ${JSON.stringify(
                               group.jobs
                             ).replace(
                               /"/g,
                               "&quot;"
                             )}, displayText: '${displayText}', groupName: '${groupName}'})">
-                                <div style="font-weight: bold; margin-bottom: 4px; color: var(--text-primary);">#${displayText} - ${groupName}</div>
-                                <div style="font-size: 12px; color: var(--text-secondary);">${progress}% complete • ${
+                                <div style="font-weight: 600; margin-bottom: 6px; color: var(--text); font-size: 16px;">#${displayText} - ${groupName}</div>
+                                <div style="font-size: 13px; color: var(--text-light); font-weight: 500;">${progress}% complete • ${
                           group.jobs.length
                         } jobs • ${group.totalDuration}</div>
-                                <div style="font-size: 11px; color: var(--text-tertiary); margin-top: 4px;">${getStatusBreakdown(
+                                <div style="font-size: 11px; color: var(--text-tertiary); margin-top: 6px; font-weight: 500;">${getStatusBreakdown(
                                   group.jobs
                                 )}</div>
                             </div>
@@ -3007,8 +3176,9 @@
           // Show basic fallback
           const cyContainer = document.getElementById("cy");
           cyContainer.innerHTML = `
-                <div style="display: flex; align-items: center; justify-content: center; height: 100%; color: var(--error-text);">
-                    <div>Failed to initialize application. Please refresh the page.</div>
+                <div style="display: flex; align-items: center; justify-content: center; height: 100%; color: var(--error-text); flex-direction: column;">
+                    <div style="font-size: 18px; font-weight: 600; margin-bottom: 8px;">⚠️ Initialization Failed</div>
+                    <div style="font-size: 14px;">Failed to initialize application. Please refresh the page.</div>
                 </div>
             `;
         }
