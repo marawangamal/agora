@@ -1,6 +1,9 @@
 import os
+import sys
 import appdirs
 import argparse
+import subprocess
+
 from typing import Callable, Optional
 from pathlib import Path
 from agora.job_submitter import JobSubmitter
@@ -162,6 +165,10 @@ def parse_args():
         "--no-browser", action="store_true", help="Don't open browser automatically"
     )
 
+    ###### agora pit (tmux cockpit)
+    p_pit = sub.add_parser("pit", help="Launch tmux cockpit with command monitoring")
+    p_pit.add_argument("command", nargs="+", help="Command to run in the left pane")
+
     ###### agora info
     p_info = sub.add_parser("info", help="Show agora info")
     p_info.add_argument(
@@ -292,6 +299,29 @@ def main():
         print(f"📁 Cache directory: {cache_dir}")
         print(f"🗄️  Database file: {args.db}")
         print(f"📊 Database exists: {'Yes' if Path(args.db).exists() else 'No'}")
+
+    # Launch tmux cockpit debug session
+    elif args.cmd == "pit":
+        script_path = Path(__file__).parent.parent / "scripts" / "tmux_cockpit.sh"
+        cmds = ["bash", str(script_path)] + args.command
+        try:
+            subprocess.run(cmds, check=True)
+        except subprocess.CalledProcessError as e:
+            if e.returncode == 127:  # Command not found
+                print("❌ Error: tmux not found. Please install tmux first.")
+                print("   macOS: brew install tmux")
+                print("   Ubuntu/Debian: sudo apt-get install tmux")
+                print("   CentOS/RHEL: sudo yum install tmux")
+                print("   Windows: Use WSL or install via package manager")
+            else:
+                print(f"❌ Error running tmux cockpit: {e}")
+            sys.exit(1)
+        except FileNotFoundError:
+            print("❌ Error: tmux not found. Please install tmux first.")
+            print("   macOS: brew install tmux")
+            print("   Ubuntu/Debian: sudo apt-get install tmux")
+            print("   CentOS/RHEL: sudo yum install tmux")
+            sys.exit(1)
 
     else:
         print("Unknown command")
