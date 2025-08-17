@@ -303,25 +303,7 @@ def main():
     # Launch tmux cockpit debug session
     elif args.cmd == "pit":
         script_path = Path(__file__).parent.parent / "scripts" / "tmux_cockpit.sh"
-        cmds = ["bash", str(script_path)] + args.command
-        try:
-            subprocess.run(cmds, check=True)
-        except subprocess.CalledProcessError as e:
-            if e.returncode == 127:  # Command not found
-                print("❌ Error: tmux not found. Please install tmux first.")
-                print("   macOS: brew install tmux")
-                print("   Ubuntu/Debian: sudo apt-get install tmux")
-                print("   CentOS/RHEL: sudo yum install tmux")
-                print("   Windows: Use WSL or install via package manager")
-            else:
-                print(f"❌ Error running tmux cockpit: {e}")
-            sys.exit(1)
-        except FileNotFoundError:
-            print("❌ Error: tmux not found. Please install tmux first.")
-            print("   macOS: brew install tmux")
-            print("   Ubuntu/Debian: sudo apt-get install tmux")
-            print("   CentOS/RHEL: sudo yum install tmux")
-            sys.exit(1)
+        subprocess.run(["bash", str(script_path)] + args.command)
 
     else:
         print("Unknown command")
