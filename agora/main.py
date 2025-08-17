@@ -302,8 +302,8 @@ def main():
 
     # Launch tmux cockpit debug session
     elif args.cmd == "pit":
-        script_path = Path(__file__).parent.parent / "scripts" / "tmux_cockpit.sh"
-        subprocess.run(["bash", str(script_path)] + args.command)
+        script_path = os.path.join(os.path.dirname(__file__), "tmux_cockpit.sh")
+        subprocess.run(["bash", script_path] + args.command)
 
     else:
         print("Unknown command")
