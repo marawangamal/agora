@@ -143,6 +143,20 @@ class JobSubmitter(JobDB):
                     job.id, on_delete=lambda id: self.cancel(id), cascade=True
                 )
 
+    def retry_by_node(self, node_ids: List[str]):
+        """Retry all jobs associated with specific node IDs."""
+        if not node_ids:
+            print("No node IDs provided, retrying all jobs in the database.")
+            return
+        for node_id in node_ids:
+            jobs = self.get_jobs([f"node_id={node_id}"])
+            if not jobs:
+                print(f"No jobs found for node ID {node_id}.")
+                continue
+            for job in jobs:
+                print(f"Retrying job {job.id} associated with node {node_id}")
+                self.retry(job.id, force=True)
+
     def retry(self, job_id: str, force: bool = False, debug: bool = False):
         """Retry a job with the given job ID."""
         job = self.get_jobs([f"id={job_id}"])[0]

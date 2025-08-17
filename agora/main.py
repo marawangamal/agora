@@ -142,6 +142,12 @@ def parse_args():
     p_retry.add_argument(
         "--debug", action="store_true", help="Don't call sbatch, just print & record"
     )
+    p_retry.add_argument(
+        "-n",
+        "--node_ids",
+        nargs="*",
+        help="Node IDs to delete (space-separated). If provided, deletes jobs for these nodes only.",
+    )
 
     ###### agora serve (start web interface)
     p_serve = sub.add_parser("serve", help="Start Next.js web interface server")
@@ -211,8 +217,11 @@ def main():
 
     elif args.cmd == "retry":
         jr = JobSubmitter(args.db, deptype=args.deptype)
-        for job_id in args.job_ids:
-            jr.retry(job_id, force=args.force, debug=args.debug)
+        if args.node_ids:
+            jr.retry_by_node(args.node_ids)
+        else:
+            for job_id in args.job_ids:
+                jr.retry(job_id, force=args.force, debug=args.debug)
 
     # Show job statuses
     elif args.cmd == "status":
