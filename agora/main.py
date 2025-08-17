@@ -302,7 +302,9 @@ def main():
 
     # Launch tmux cockpit debug session
     elif args.cmd == "pit":
-        script_path = os.path.join(os.path.dirname(__file__), "tmux_cockpit.sh")
+        script_path = os.path.join(
+            os.path.dirname(__file__), "scripts", "tmux_cockpit.sh"
+        )
         subprocess.run(["bash", script_path] + args.command)
 
     else:
