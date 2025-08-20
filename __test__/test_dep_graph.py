@@ -143,6 +143,72 @@ class TestJrunSimple(unittest.TestCase):
         assert jobs[0].node_id != jobs[1].node_id
         print("Test completed successfully!")
 
+    @patch("os.popen")
+    def test_pll_sweep_root_workflow(self, mock_popen):
+        """Test that jobs are submitted correctly."""
+
+        ##### Setup mocks
+        mock_popen.side_effect = self.get_popen_mock_fn()
+
+        ##### Setup test
+        submitter = JobSubmitter(self.db_path)
+        root = {
+            "group": {
+                "name": "test-group",
+                "type": "parallel:root",
+                "jobs": [
+                    {
+                        "group": {
+                            "type": "sweep",
+                            "sweep": {
+                                "param1": ["a"],
+                            },
+                            "sweep_template": "echo First job with param1={param1}",
+                        }
+                    },
+                    {
+                        "group": {
+                            "type": "sweep",
+                            "sweep": {
+                                "param1": ["b"],
+                            },
+                            "sweep_template": "echo Second job with param1={param1}",
+                        }
+                    },
+                ],
+            }
+        }
+        preamble_map = {
+            "base": "\n".join(
+                [
+                    "#!/bin/bash",
+                    "#SBATCH --partition=debug",
+                    "#SBATCH --output=test-%j.out",
+                    "#SBATCH --error=test-%j.err",
+                ]
+            ),
+            "gpu": "\n".join(
+                [
+                    "#SBATCH --gres=gpu:1",
+                    "#SBATCH --mem=8G",
+                ]
+            ),
+        }
+
+        ##### Submit jobs
+        submitter.walk(
+            node=submitter._parse_group_dict(root["group"]),
+            node_name=root["group"]["name"],
+            preamble_map=preamble_map,
+            depends_on=[],
+            submitted_jobs=[],
+        )
+
+        # Verify jobs are in the database
+        jobs = submitter.get_jobs()
+        assert jobs[0].node_id != jobs[1].node_id
+        print("Test completed successfully!")
+
 
 if __name__ == "__main__":
     unittest.main()
