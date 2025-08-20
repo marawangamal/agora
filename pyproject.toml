@@ -35,4 +35,4 @@ agora = "agora.main:main"
 include = ["agora*"]
 
 [tool.setuptools.package-data]
-agora = ["web/", "web/*/"]
+agora = ["web/", "web/*/", "scripts/*.sh"]

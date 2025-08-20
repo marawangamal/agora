@@ -1,6 +1,9 @@
 import os
+import sys
 import appdirs
 import argparse
+import subprocess
+
 from typing import Callable, Optional
 from pathlib import Path
 from agora.job_submitter import JobSubmitter
@@ -142,6 +145,12 @@ def parse_args():
     p_retry.add_argument(
         "--debug", action="store_true", help="Don't call sbatch, just print & record"
     )
+    p_retry.add_argument(
+        "-n",
+        "--node_ids",
+        nargs="*",
+        help="Node IDs to delete (space-separated). If provided, deletes jobs for these nodes only.",
+    )
 
     ###### agora serve (start web interface)
     p_serve = sub.add_parser("serve", help="Start Next.js web interface server")
@@ -155,6 +164,10 @@ def parse_args():
     p_serve.add_argument(
         "--no-browser", action="store_true", help="Don't open browser automatically"
     )
+
+    ###### agora pit (tmux cockpit)
+    p_pit = sub.add_parser("pit", help="Launch tmux cockpit with command monitoring")
+    p_pit.add_argument("command", nargs="+", help="Command to run in the left pane")
 
     ###### agora info
     p_info = sub.add_parser("info", help="Show agora info")
@@ -211,8 +224,11 @@ def main():
 
     elif args.cmd == "retry":
         jr = JobSubmitter(args.db, deptype=args.deptype)
-        for job_id in args.job_ids:
-            jr.retry(job_id, force=args.force, debug=args.debug)
+        if args.node_ids:
+            jr.retry_by_node(args.node_ids)
+        else:
+            for job_id in args.job_ids:
+                jr.retry(job_id, force=args.force, debug=args.debug)
 
     # Show job statuses
     elif args.cmd == "status":
@@ -283,6 +299,13 @@ def main():
         print(f"📁 Cache directory: {cache_dir}")
         print(f"🗄️  Database file: {args.db}")
         print(f"📊 Database exists: {'Yes' if Path(args.db).exists() else 'No'}")
+
+    # Launch tmux cockpit debug session
+    elif args.cmd == "pit":
+        script_path = os.path.join(
+            os.path.dirname(__file__), "scripts", "tmux_cockpit.sh"
+        )
+        subprocess.run(["bash", script_path] + args.command)
 
     else:
         print("Unknown command")
