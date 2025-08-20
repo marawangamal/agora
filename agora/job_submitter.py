@@ -224,7 +224,27 @@ class JobSubmitter(JobDB):
         node_name: str = "",
         loop_idx: Optional[int] = None,
     ):
-        """Recursively walk the job tree and submit jobs."""
+        """Recursively walk the job tree and submit jobs.
+
+        This will recursively walk the job tree and submit jobs, creating a tree of nodes. A Node is a
+        group of jobs in which all jobs in the node are within a loop, sequence or parallel group.
+
+
+        Args:
+            node (Union[PGroup, PJob]): The current node to process
+            preamble_map (Dict[str, str]): A dictionary of preamble names and their corresponding lines
+            debug (bool, optional): Whether to print debug information. Defaults to False.
+            depends_on (List[str], optional): A list of job IDs that this job depends on. Defaults to [].
+            submitted_jobs (List[str], optional): A list of job IDs that have already been submitted. Defaults to [].
+            submit_fn (Optional[Callable[[Job], str]], optional): A function to submit a job. Defaults to None.
+            group_id (Optional[str], optional): The ID of the group this job belongs to. Defaults to None.
+            node_id (Optional[str], optional): The ID of the node this job belongs to. Defaults to None.
+            node_name (str, optional): The name of the node this job belongs to. Defaults to "".
+            loop_idx (Optional[int], optional): The index of the loop this job belongs to. Defaults to None.
+
+        Returns:
+            List[str]: A list of job IDs that have been submitted.
+        """
         submit_fn = submit_fn if submit_fn is not None else self._submit_job
         subgroup_id = f"{random.randint(100000, 999999)}"
         group_id = subgroup_id if group_id is None else f"{group_id}-{subgroup_id}"
@@ -323,6 +343,31 @@ class JobSubmitter(JobDB):
                 f"{random.randint(100000, 999999)}" if node_id is None else node_id
             )
             for entry in node.jobs:
+                group_name_i = ":".join(
+                    [p for p in [copy.deepcopy(node_name), entry.name] if p]
+                )
+                job_ids = self.walk(
+                    entry,
+                    debug=debug,
+                    preamble_map=preamble_map,
+                    depends_on=copy.deepcopy(depends_on),
+                    submitted_jobs=submitted_jobs,
+                    submit_fn=submit_fn,
+                    group_id=copy.deepcopy(group_id),
+                    node_name=copy.deepcopy(group_name_i),
+                    node_id=copy.deepcopy(node_id),
+                    loop_idx=copy.deepcopy(loop_idx),
+                )
+                if job_ids:
+                    parallel_job_ids.extend(job_ids)
+            return parallel_job_ids
+
+        elif node.type == "parallel:root":
+            # Parallel group
+            parallel_job_ids = []
+            for entry in node.jobs:
+                # root parallel case: all jobs have unique node_ids
+                node_id = f"{random.randint(100000, 999999)}"
                 group_name_i = ":".join(
                     [p for p in [copy.deepcopy(node_name), entry.name] if p]
                 )
