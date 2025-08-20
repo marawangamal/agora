@@ -75,48 +75,76 @@ agora sbatch --cpus-per-task=4 --mem=16G --wrap="python train.py"
 
 ## Quick start
 
-#### Define a tree of jobs
+#### Define a machine learning workflow
 
 ```yaml
-# Define tree
+# This example shows a typical ML pipeline:
+# 1. Train multiple models in parallel
+# 2. Evaluate all models
+# 3. Generate a comparison report
 group:
-  name: "test"
+  name: "ml-pipeline"
   type: sequential
   jobs:
-    - group:
+    - group: 
+        name: "training"
         type: parallel
         jobs:
           - job:
-              preamble: cpu
-              command: "echo 'python train.py'"
+              preamble: gpu
+              command: "python train.py --model resnet --lr 0.001 --epochs 100"
 
           - job:
-              preamble: cpu
-              command: "echo 'python eval.py'"
+              preamble: gpu
+              command: "python train.py --model vgg --lr 0.001 --epochs 100"
+              
+          - job:
+              preamble: gpu
+              command: "python train.py --model efficientnet --lr 0.001 --epochs 100"
+    
     - job:
         preamble: cpu
-        command: "echo 'python make_report.py'"
+        command: "python evaluate.py --models resnet vgg efficientnet"
+        
+    - job:
+        preamble: cpu
+        command: "python generate_report.py --output results_comparison.pdf"
 
-# Define preambles
+# Define resource configurations
 preambles:
+  gpu:
+    - "#!/bin/bash"
+    - "#SBATCH --gres=gpu:1"
+    - "#SBATCH --cpus-per-task=4"
+    - "#SBATCH --mem=16G"
+    - "#SBATCH --time=24:00:00"
+    - "#SBATCH --output=logs/train_%j.out"
+    - "#SBATCH --error=logs/train_%j.err"
+  
   cpu:
     - "#!/bin/bash"
-    - "#SBATCH --cpus-per-task=4"
-    - "#SBATCH --mem=8G"
-    - "#SBATCH --output=slurm/slurm-%j.out"
-    - "#SBATCH --error=slurm/slurm-%j.err"
-
+    - "#SBATCH --cpus-per-task=8"
+    - "#SBATCH --mem=32G"
+    - "#SBATCH --time=4:00:00"
+    - "#SBATCH --output=logs/eval_%j.out"
+    - "#SBATCH --error=logs/eval_%j.err"
 ```
 
-#### Submit tree and visuzlize
+#### Submit and monitor your workflow
 ```bash
-$ agora submit --file path/to/job/tree.yaml
-$ agora viz # add `--mode mermaid` for mermaid diagram
+$ agora submit --file ml_pipeline.yaml
+Submitted workflow: ml-pipeline (ID: abc-123-def)
+
+$ agora status
 Job Dependencies:
 ========================================
-6866829 []: (COMPLETED): echo 'python train.py'
-6866830 []: (COMPLETED): echo 'python eval.py'
-6866831 []: (PENDING): echo 'python make_report.py' <- 6866829, 6866830
+6866829 [training]: (RUNNING): python train.py --model resnet --lr 0.001 --epochs 100
+6866830 [training]: (RUNNING): python train.py --model vgg --lr 0.001 --epochs 100
+6866831 [training]: (RUNNING): python train.py --model efficientnet --lr 0.001 --epochs 100
+6866832 []: (PENDING): python evaluate.py --models resnet vgg efficientnet <- 6866829, 6866830, 6866831
+6866833 []: (PENDING): python generate_report.py --output results_comparison.pdf <- 6866832
+
+$ agora viz  # Visualize the dependency graph
 ```
 
 
@@ -150,7 +178,8 @@ group:
         command: "python train_model_b.py"
 ```
 
-### Link jobs with group ids
+### Link jobs with group ids 
+Each job has a `group_id` which acts as an address of where it lives. You can use this to link scripts. For example, maybe you have a `python eval.py` that accepts a group_id param and uses it to filter out which checkpoint to run eval on.
 
 ```yaml
 # Use `{group_id}` in commands to link jobs
