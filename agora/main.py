@@ -13,13 +13,19 @@ from agora.server import serve
 
 def get_default_db_path():
     """Get the default database path using appdirs user cache directory."""
-    cache_dir = appdirs.user_cache_dir("agora")
+    cache_dir = get_cache_directory()
     Path(cache_dir).mkdir(parents=True, exist_ok=True)
     return str(Path(cache_dir) / "agora.db")
 
 
 def get_cache_directory():
     """Get the cache directory path for agora."""
+    # Check for AGORA_CACHE_DIR environment variable first
+    env_cache_dir = os.environ.get("AGORA_CACHE_DIR")
+    if env_cache_dir:
+        return env_cache_dir
+
+    # Fall back to appdirs user cache directory
     return appdirs.user_cache_dir("agora")
 
 
@@ -296,7 +302,18 @@ def main():
     # Show agora info
     elif args.cmd == "info":
         cache_dir = get_cache_directory()
+        env_cache_dir = os.environ.get("AGORA_CACHE_DIR")
+
         print(f"📁 Cache directory: {cache_dir}")
+        if env_cache_dir:
+            print(
+                f"🔧 Using custom cache directory from AGORA_CACHE_DIR: {env_cache_dir}"
+            )
+        else:
+            print(f"🔧 Using default cache directory (appdirs.user_cache_dir)")
+            print(
+                f"💡 You can set a custom cache directory with: export AGORA_CACHE_DIR=/your/path"
+            )
         print(f"🗄️  Database file: {args.db}")
         print(f"📊 Database exists: {'Yes' if Path(args.db).exists() else 'No'}")
 
